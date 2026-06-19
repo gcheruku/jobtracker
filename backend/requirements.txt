@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+sqlmodel>=0.0.16
+python-multipart>=0.0.9
+pypdf>=4.0
+# Optional: only needed if you set ANTHROPIC_API_KEY for real LLM analysis.
+anthropic>=0.40

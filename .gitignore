@@ -1,0 +1,26 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+backend/.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/*.tsbuildinfo
+
+# Data / uploads (keep these local; they hold your real personal job data and
+# should not be committed to version control).
+jobs.db
+*.db-journal
+jobs.db.backup-*
+uploads/
+
+# Local tooling
+.claude/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
