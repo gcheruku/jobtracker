@@ -14,6 +14,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from . import models  # noqa: F401  (ensures models register on SQLModel.metadata)
 from .config import DATABASE_URL
+from .logging_config import logger
 
 # check_same_thread=False is required for SQLite under FastAPI's threadpool.
 engine = create_engine(
@@ -36,14 +37,25 @@ def _add_column_if_missing(conn, table: str, column: str, ddl_type: str) -> None
 def init_db() -> None:
     """Idempotent: safe to call on every startup."""
     with engine.begin() as conn:
+        before = _existing_columns(conn, "jobs")
         # Additive columns on the existing jobs table.
         _add_column_if_missing(conn, "jobs", "ignored", "INTEGER DEFAULT 0")
         _add_column_if_missing(conn, "jobs", "work_mode", "TEXT")
         # Normalize any NULL ignored values left by older rows.
         conn.execute(text("UPDATE jobs SET ignored = 0 WHERE ignored IS NULL"))
 
+        added = _existing_columns(conn, "jobs") - before
+        total = conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar()
+        skipped = conn.execute(
+            text("SELECT COUNT(*) FROM jobs WHERE ignored = 1")
+        ).scalar()
+
     # Create the brand-new tables; existing tables are left untouched.
     SQLModel.metadata.create_all(engine)
+
+    if added:
+        logger.info("Migration: added columns to jobs: %s", ", ".join(sorted(added)))
+    logger.info("DB ready: %d jobs (%d skipped)", total, skipped)
 
 
 def get_session():

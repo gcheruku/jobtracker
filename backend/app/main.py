@@ -7,12 +7,18 @@ Interactive OpenAPI docs are auto-generated at /docs and /redoc.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+import time
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import CORS_ORIGINS, PIPELINE_STATUSES
+from .config import CORS_ORIGINS, DATABASE_URL, PIPELINE_STATUSES
 from .database import init_db
+from .logging_config import logger, setup_logging
 from .routers import ai, jobs, resume, stats
+
+# Configure console logging before anything else emits a record.
+setup_logging()
 
 app = FastAPI(
     title="JobTrack API",
@@ -30,10 +36,40 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log one line per request: method, path, status, and duration."""
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        elapsed = (time.perf_counter() - start) * 1000
+        logger.exception(
+            "%s %s -> 500 ERROR in %.1fms", request.method, request.url.path, elapsed
+        )
+        raise
+    elapsed = (time.perf_counter() - start) * 1000
+    query = f"?{request.url.query}" if request.url.query else ""
+    logger.info(
+        "%s %s%s -> %d in %.1fms",
+        request.method,
+        request.url.path,
+        query,
+        response.status_code,
+        elapsed,
+    )
+    return response
+
+
 @app.on_event("startup")
 def _startup() -> None:
+    logger.info("Starting JobTrack API")
+    logger.info("Database: %s", DATABASE_URL)
+    logger.info("CORS origins: %s", CORS_ORIGINS)
+    logger.info("Pipeline: %s", " | ".join(PIPELINE_STATUSES))
     # Non-destructive: adds new columns/tables to the existing jobs.db.
     init_db()
+    logger.info("Startup complete — docs at /docs")
 
 
 @app.get("/api/health", tags=["meta"])
