@@ -38,8 +38,15 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 # Latest, most capable model for the resume-fit analysis when a key is present.
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
 
-# Statuses that make up the visible Kanban pipeline, in display order.
+# All valid statuses a job can hold (also the move targets in the drawer).
 PIPELINE_STATUSES = ["Saved", "Applied", "Interviewing", "Offer", "Rejected", "Expired"]
+
+# Statuses that appear as columns on the active Kanban board.
+BOARD_STATUSES = ["Saved", "Applied", "Interviewing", "Offer"]
+
+# Statuses that are kept off the board and surfaced in the "Inactive" view
+# (together with skipped/ignored jobs).
+OFF_BOARD_STATUSES = ["Rejected", "Expired"]
 
 # How legacy/raw statuses found in the existing data map onto the columns.
 # - "Rejected" means the company rejected an application I submitted.

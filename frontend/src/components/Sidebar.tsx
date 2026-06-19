@@ -7,21 +7,21 @@ import {
   Settings,
 } from "lucide-react";
 
-export type View = "dashboard" | "skipped";
+export type View = "dashboard" | "inactive";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "skipped", label: "Skipped", icon: Archive },
+  { id: "inactive", label: "Inactive", icon: Archive },
 ];
 
 export function Sidebar({
   view,
   setView,
-  skippedCount,
+  inactiveCount,
 }: {
   view: View;
   setView: (v: View) => void;
-  skippedCount: number;
+  inactiveCount: number;
 }) {
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -49,9 +49,9 @@ export function Sidebar({
                 <Icon size={18} />
                 {label}
               </span>
-              {id === "skipped" && skippedCount > 0 && (
+              {id === "inactive" && inactiveCount > 0 && (
                 <span className="rounded-full bg-slate-200 px-2 text-xs text-slate-600">
-                  {skippedCount}
+                  {inactiveCount}
                 </span>
               )}
             </button>

@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { EyeOff, MapPin } from "lucide-react";
-import { PIPELINE, type Job, type PipelineStatus } from "../lib/types";
+import { BOARD_STATUSES, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, initials } from "../lib/ui";
 
 function MatchBadge({ job }: { job: Job }) {
@@ -144,10 +144,9 @@ export function KanbanBoard({
   );
 
   const byStatus = useMemo(() => {
-    const map = Object.fromEntries(PIPELINE.map((s) => [s, [] as Job[]])) as Record<
-      PipelineStatus,
-      Job[]
-    >;
+    const map = Object.fromEntries(
+      BOARD_STATUSES.map((s) => [s, [] as Job[]])
+    ) as Record<PipelineStatus, Job[]>;
     for (const j of jobs) map[j.status]?.push(j);
     return map;
   }, [jobs]);
@@ -165,7 +164,7 @@ export function KanbanBoard({
   return (
     <DndContext sensors={sensors} onDragStart={handleStart} onDragEnd={handleEnd}>
       <div className="flex gap-4 overflow-x-auto pb-2">
-        {PIPELINE.map((status) => (
+        {BOARD_STATUSES.map((status) => (
           <Column
             key={status}
             status={status}

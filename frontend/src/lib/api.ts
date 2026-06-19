@@ -37,6 +37,8 @@ export const api = {
     if (filters.min_salary) p.set("min_salary", String(filters.min_salary));
     if (filters.sort) p.set("sort", filters.sort);
     if (filters.only_ignored) p.set("only_ignored", "true");
+    if (filters.board_only) p.set("board_only", "true");
+    if (filters.off_board) p.set("off_board", "true");
     return http<Job[]>(`/api/jobs?${p.toString()}`);
   },
   getJob(k: string): Promise<Job> {

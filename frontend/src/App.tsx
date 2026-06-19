@@ -8,8 +8,9 @@ import { MetricCards } from "./components/MetricCards";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { JobDrawer } from "./components/JobDrawer";
 import { ActivityLog } from "./components/ActivityLog";
-import { SkippedView } from "./components/SkippedView";
+import { InactiveView } from "./components/InactiveView";
 import { api } from "./lib/api";
+import { BOARD_STATUSES, OFF_BOARD_STATUSES } from "./lib/types";
 import type { Job, JobFilters, PipelineStatus } from "./lib/types";
 
 export default function App() {
@@ -17,13 +18,19 @@ export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [filters, setFilters] = useState<JobFilters>({ sort: "recent" });
   const [selected, setSelected] = useState<Job | null>(null);
-  const [activityOpen, setActivityOpen] = useState(true);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   const jobs = useQuery({
     queryKey: ["jobs", "board", filters],
-    queryFn: () => api.listJobs(filters),
+    queryFn: () => api.listJobs({ ...filters, board_only: true }),
   });
   const stats = useQuery({ queryKey: ["stats"], queryFn: api.stats });
+
+  const byStatus = stats.data?.by_status ?? {};
+  const boardTotal = BOARD_STATUSES.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
+  const inactiveCount =
+    (stats.data?.ignored ?? 0) +
+    OFF_BOARD_STATUSES.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["jobs"] });
@@ -56,18 +63,18 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar view={view} setView={setView} skippedCount={stats.data?.ignored ?? 0} />
+      <Sidebar view={view} setView={setView} inactiveCount={inactiveCount} />
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <TopBar
-          title={view === "dashboard" ? "Dashboard" : "Skipped jobs"}
+          title={view === "dashboard" ? "Dashboard" : "Inactive jobs"}
           filters={filters}
           setFilters={setFilters}
         />
 
-        {view === "skipped" ? (
+        {view === "inactive" ? (
           <div className="flex-1 overflow-y-auto">
-            <SkippedView filters={filters} />
+            <InactiveView filters={filters} />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-6">
@@ -83,8 +90,7 @@ export default function App() {
                   <h2 className="text-base font-semibold">Application pipeline</h2>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-400">
-                      {jobs.data?.length ?? 0} shown ·{" "}
-                      {stats.data?.visible ?? 0} total
+                      {jobs.data?.length ?? 0} shown · {boardTotal} active
                     </span>
                     {!activityOpen && (
                       <button

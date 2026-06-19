@@ -10,7 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from ..config import PIPELINE_STATUSES, STATUS_DISPLAY_MAP
+from ..config import (
+    BOARD_STATUSES,
+    OFF_BOARD_STATUSES,
+    PIPELINE_STATUSES,
+    STATUS_DISPLAY_MAP,
+)
 from ..database import get_session
 from ..models import ChecklistItem, Job, Note
 from ..schemas import (
@@ -68,11 +73,17 @@ def list_jobs(
     min_salary: Optional[int] = Query(None, description="parse salary, keep >= this"),
     include_ignored: bool = Query(False, description="show ignored jobs too"),
     only_ignored: bool = Query(False, description="show ONLY ignored jobs"),
+    board_only: bool = Query(False, description="only active board statuses"),
+    off_board: bool = Query(
+        False, description="only off-board jobs: ignored OR Rejected/Expired"
+    ),
     sort: str = Query("recent", description="recent | match | company | title"),
 ):
     stmt = select(Job)
 
-    if only_ignored:
+    if off_board:
+        pass  # need ignored + visible off-board jobs; filter in Python below
+    elif only_ignored:
         stmt = stmt.where(Job.ignored == True)  # noqa: E712
     elif not include_ignored:
         stmt = stmt.where((Job.ignored == False) | (Job.ignored == None))  # noqa: E711,E712
@@ -90,6 +101,13 @@ def list_jobs(
 
     jobs = session.exec(stmt).all()
     out = [_to_out(j) for j in jobs]
+
+    # Off-board view: skipped jobs PLUS any job whose status is off the board.
+    if off_board:
+        out = [j for j in out if j.ignored or j.status in OFF_BOARD_STATUSES]
+    # Active board: non-ignored jobs whose status is an actual board column.
+    if board_only:
+        out = [j for j in out if not j.ignored and j.status in BOARD_STATUSES]
 
     # Display-status filter applies after mapping (Viewed->Saved etc.).
     if status:

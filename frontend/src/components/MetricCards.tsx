@@ -1,11 +1,11 @@
-import { PIPELINE } from "../lib/types";
+import { BOARD_STATUSES } from "../lib/types";
 import { STATUS_STYLES } from "../lib/ui";
 import type { Stats } from "../lib/types";
 
 export function MetricCards({ stats }: { stats?: Stats }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-      {PIPELINE.map((s) => {
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {BOARD_STATUSES.map((s) => {
         const style = STATUS_STYLES[s];
         const count = stats?.by_status[s] ?? 0;
         return (

@@ -6,6 +6,7 @@ export type PipelineStatus =
   | "Rejected"
   | "Expired";
 
+// All statuses (move targets in the drawer).
 export const PIPELINE: PipelineStatus[] = [
   "Saved",
   "Applied",
@@ -14,6 +15,17 @@ export const PIPELINE: PipelineStatus[] = [
   "Rejected",
   "Expired",
 ];
+
+// Columns shown on the active board.
+export const BOARD_STATUSES: PipelineStatus[] = [
+  "Saved",
+  "Applied",
+  "Interviewing",
+  "Offer",
+];
+
+// Statuses kept off the board (shown in the Inactive view alongside skipped jobs).
+export const OFF_BOARD_STATUSES: PipelineStatus[] = ["Rejected", "Expired"];
 
 export interface Job {
   job_key: string;
@@ -91,4 +103,6 @@ export interface JobFilters {
   min_salary?: number;
   sort?: string;
   only_ignored?: boolean;
+  board_only?: boolean;
+  off_board?: boolean;
 }
