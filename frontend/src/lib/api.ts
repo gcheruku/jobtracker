@@ -1,6 +1,7 @@
 import type {
   ChecklistItem,
   CompareResult,
+  IngestStatus,
   Job,
   JobFilters,
   Note,
@@ -125,6 +126,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ name, content_text }),
     });
+  },
+
+  // --- gmail ingest ---
+  ingestRun(): Promise<{ started: boolean; detail?: string }> {
+    return http(`/api/ingest/run`, { method: "POST" });
+  },
+  ingestStatus(): Promise<IngestStatus> {
+    return http<IngestStatus>(`/api/ingest/status`);
   },
 
   // --- ai ---

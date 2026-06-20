@@ -96,6 +96,25 @@ export interface Resume {
   uploaded_at: string;
 }
 
+export interface IngestSummary {
+  emails_scanned: number;
+  jobs_found: number;
+  new_jobs: number;
+  duplicates: number;
+  scored: number;
+  watermark_advanced_to?: string;
+}
+
+export interface IngestStatus {
+  running: boolean;
+  last_run_iso: string | null;
+  last_summary: IngestSummary | null;
+  last_error: string | null;
+  label: string;
+  interval_hours: number;
+  gemini_enabled: boolean;
+}
+
 export interface JobFilters {
   q?: string;
   status?: string;

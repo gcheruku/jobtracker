@@ -1,5 +1,6 @@
 import { Search, SlidersHorizontal } from "lucide-react";
 import type { JobFilters } from "../lib/types";
+import { FetchAlertsButton } from "./FetchAlertsButton";
 
 const WORK_MODES = ["", "Remote", "Hybrid", "On-site"];
 const SORTS = [
@@ -76,6 +77,10 @@ export function TopBar({
               })
             }
           />
+        </div>
+
+        <div className="ml-auto">
+          <FetchAlertsButton />
         </div>
       </div>
     </div>

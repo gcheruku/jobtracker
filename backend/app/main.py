@@ -12,10 +12,11 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import CORS_ORIGINS, DATABASE_URL, PIPELINE_STATUSES
+from .config import CORS_ORIGINS, DATABASE_URL, INGEST_INTERVAL_HOURS, PIPELINE_STATUSES
 from .database import init_db
 from .logging_config import logger, setup_logging
-from .routers import ai, jobs, resume, stats
+from .routers import ai, ingest, jobs, resume, stats
+from .scheduler import start_scheduler, stop_scheduler
 
 # Configure console logging before anything else emits a record.
 setup_logging()
@@ -69,7 +70,14 @@ def _startup() -> None:
     logger.info("Pipeline: %s", " | ".join(PIPELINE_STATUSES))
     # Non-destructive: adds new columns/tables to the existing jobs.db.
     init_db()
+    start_scheduler()
+    logger.info("Ingest scheduled every %.1fh", INGEST_INTERVAL_HOURS)
     logger.info("Startup complete — docs at /docs")
+
+
+@app.on_event("shutdown")
+def _shutdown() -> None:
+    stop_scheduler()
 
 
 @app.get("/api/health", tags=["meta"])
@@ -81,3 +89,4 @@ app.include_router(jobs.router)
 app.include_router(resume.router)
 app.include_router(ai.router)
 app.include_router(stats.router)
+app.include_router(ingest.router)
