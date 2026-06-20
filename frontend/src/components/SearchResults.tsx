@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { MapPin, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eye, EyeOff, MapPin, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import type { Job, JobFilters, PipelineStatus } from "../lib/types";
@@ -27,9 +27,36 @@ export function SearchResults({
   filters: JobFilters;
   onOpen: (j: Job) => void;
 }) {
+  const qc = useQueryClient();
+  const searchKey = ["jobs", "search", filters] as const;
   const results = useQuery({
-    queryKey: ["jobs", "search", filters],
+    queryKey: searchKey,
     queryFn: () => api.listJobs({ ...filters, include_ignored: true }),
+  });
+
+  const refresh = () => {
+    // Re-sync everything (incl. this search list) with server truth. The
+    // optimistic onMutate gives instant feedback; this confirms/corrects it.
+    qc.invalidateQueries({ queryKey: ["jobs"] });
+    qc.invalidateQueries({ queryKey: ["stats"] });
+    qc.invalidateQueries({ queryKey: ["activity"] });
+  };
+
+  // Optimistically flip the card's ignored flag so the chip/icon update instantly.
+  const setIgnoredLocally = (jobKey: string, ignored: boolean) =>
+    qc.setQueryData<Job[]>(searchKey, (old) =>
+      old?.map((j) => (j.job_key === jobKey ? { ...j, ignored } : j))
+    );
+
+  const skip = useMutation({
+    mutationFn: (k: string) => api.ignoreJob(k),
+    onMutate: (k: string) => setIgnoredLocally(k, true),
+    onSettled: refresh,
+  });
+  const restore = useMutation({
+    mutationFn: (k: string) => api.restoreJob(k),
+    onMutate: (k: string) => setIgnoredLocally(k, false),
+    onSettled: refresh,
   });
 
   const jobs = results.data ?? [];
@@ -50,10 +77,10 @@ export function SearchResults({
           const lbl = statusLabel(job);
           const style = STATUS_STYLES[lbl as PipelineStatus];
           return (
-            <button
+            <div
               key={job.job_key}
               onClick={() => onOpen(job)}
-              className="flex flex-col rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:shadow-md"
+              className="group flex cursor-pointer flex-col rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:shadow-md"
             >
               <div className="flex items-start gap-2">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">
@@ -67,6 +94,29 @@ export function SearchResults({
                     {job.company || "Unknown company"}
                   </div>
                 </div>
+                {job.ignored ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      restore.mutate(job.job_key);
+                    }}
+                    title="Restore this job"
+                    className="opacity-0 transition group-hover:opacity-100"
+                  >
+                    <Eye size={15} className="text-slate-400 hover:text-emerald-600" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      skip.mutate(job.job_key);
+                    }}
+                    title="Skip this job"
+                    className="opacity-0 transition group-hover:opacity-100"
+                  >
+                    <EyeOff size={15} className="text-slate-400 hover:text-rose-500" />
+                  </button>
+                )}
                 <span
                   className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
                     style?.chip ?? "bg-slate-100 text-slate-600"
@@ -87,7 +137,7 @@ export function SearchResults({
                   {job.salary}
                 </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

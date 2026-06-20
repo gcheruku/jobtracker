@@ -44,6 +44,18 @@ def init_db() -> None:
         # Normalize any NULL ignored values left by older rows.
         conn.execute(text("UPDATE jobs SET ignored = 0 WHERE ignored IS NULL"))
 
+        # A '/' in a job_key breaks FastAPI path-param routing (it 404s every
+        # path-based action). Sanitize any that exist so external ingesters that
+        # use raw titles in keys can't reintroduce broken rows. OR IGNORE skips
+        # the rare case where sanitizing would collide with an existing key.
+        for tbl in ("note", "checklist_item", "jobs"):
+            conn.execute(
+                text(
+                    f"UPDATE OR IGNORE {tbl} SET job_key = replace(job_key, '/', '-') "
+                    "WHERE job_key LIKE '%/%'"
+                )
+            )
+
         added = _existing_columns(conn, "jobs") - before
         total = conn.execute(text("SELECT COUNT(*) FROM jobs")).scalar()
         skipped = conn.execute(

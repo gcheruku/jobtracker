@@ -43,10 +43,16 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _safe(s: str) -> str:
+    # Slashes break FastAPI path-param routing even when URL-encoded, so keep
+    # them (and backslashes) out of the job_key, which is used in URL paths.
+    return s.replace("/", "-").replace("\\", "-")
+
+
 def _job_key(provider: str, job: dict) -> str:
-    """Stable identity key. Title|company based so the same job dedups whether or
-    not a URL was captured (URLs vary across resent alerts)."""
-    return f"{provider}:{norm(job.get('title'))}|{norm(job.get('company'))}"
+    """Stable, URL-path-safe identity key. Title|company based so the same job
+    dedups whether or not a URL was captured (URLs vary across resent alerts)."""
+    return f"{provider}:{_safe(norm(job.get('title')))}|{_safe(norm(job.get('company')))}"
 
 
 def _watermark(session: Session) -> int:
