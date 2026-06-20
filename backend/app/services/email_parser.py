@@ -7,8 +7,9 @@ the known job domains. The Gemini extractor turns that into structured jobs.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
@@ -48,6 +49,34 @@ class EmailPayload:
     epoch: int
     text: str
     links: List[dict] = field(default_factory=list)
+
+
+def norm(s: Optional[str]) -> str:
+    return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+
+def match_link(title: str, links: List[dict]) -> Optional[str]:
+    """Deterministically pick the email link for a job by its title.
+
+    Job-alert templates (LinkedIn especially) use the job title as the anchor
+    text, so exact/substring/token-overlap matching recovers URLs the LLM
+    extractor sometimes fails to map.
+    """
+    nt = norm(title)
+    if not nt:
+        return None
+    title_tokens = set(nt.split())
+    best_url, best_score = None, 0.0
+    for link in links:
+        lt = norm(link.get("text"))
+        if not lt:
+            continue
+        if lt == nt or nt in lt or lt in nt:
+            return link["url"]
+        overlap = len(title_tokens & set(lt.split())) / max(1, len(title_tokens))
+        if overlap > best_score:
+            best_score, best_url = overlap, link["url"]
+    return best_url if best_score >= 0.6 else None
 
 
 def provider_of(from_header: str) -> str:

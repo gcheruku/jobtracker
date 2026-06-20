@@ -14,8 +14,6 @@ scheduler and the manual endpoint, and let the UI poll progress.
 """
 from __future__ import annotations
 
-import hashlib
-import re
 import threading
 from datetime import datetime, timezone
 
@@ -27,7 +25,7 @@ from ..database import engine
 from ..logging_config import logger
 from ..models import Job
 from . import gmail_client as gm
-from .email_parser import build_payload, is_job_email
+from .email_parser import build_payload, is_job_email, match_link, norm
 from .gemini_client import extract_jobs, score_job
 from .resume_loader import resume_text
 
@@ -45,16 +43,10 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _norm(s: str | None) -> str:
-    return re.sub(r"\s+", " ", (s or "").strip().lower())
-
-
 def _job_key(provider: str, job: dict) -> str:
-    """Stable identity for dedup. Prefer URL; fall back to title|company."""
-    url = (job.get("url") or "").strip()
-    if url:
-        return f"{provider}:url:" + hashlib.sha1(url.encode()).hexdigest()[:16]
-    return f"{provider}:{_norm(job.get('title'))}|{_norm(job.get('company'))}"
+    """Stable identity key. Title|company based so the same job dedups whether or
+    not a URL was captured (URLs vary across resent alerts)."""
+    return f"{provider}:{norm(job.get('title'))}|{norm(job.get('company'))}"
 
 
 def _watermark(session: Session) -> int:
@@ -70,6 +62,13 @@ def _watermark(session: Session) -> int:
 def _existing_urls(session: Session) -> set[str]:
     rows = session.exec(text("SELECT url FROM jobs WHERE url IS NOT NULL")).all()
     return {r[0] for r in rows if r[0]}
+
+
+def _existing_pairs(session: Session) -> set[tuple[str, str]]:
+    """(title, company) identity of every job already in the DB — used to dedup
+    against rows from the old pipeline too (which use different job_key formats)."""
+    rows = session.exec(text("SELECT title, company FROM jobs")).all()
+    return {(norm(r[0]), norm(r[1])) for r in rows if r[0] and r[1]}
 
 
 def _save_watermark(session: Session, epoch: int) -> None:
@@ -104,7 +103,7 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
         with Session(engine) as session:
             watermark = _watermark(session)
             seen_urls = _existing_urls(session)
-            seen_keys: set[str] = set()
+            seen_pairs = _existing_pairs(session)
             resume = resume_text()
             newest_epoch = watermark
 
@@ -131,14 +130,19 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
                         continue
                     summary["jobs_found"] += 1
                     key = _job_key(payload.provider, job)
-                    url = (job.get("url") or "").strip()
-                    if key in seen_keys or (url and url in seen_urls):
+                    pair = (norm(job.get("title")), norm(job.get("company")))
+                    # Recover a URL the LLM may have missed by matching the email
+                    # links against the job title.
+                    url = (job.get("url") or "").strip() or (
+                        match_link(job.get("title", ""), payload.links) or ""
+                    )
+                    # Dedup against everything already in the DB: same job
+                    # (title|company) OR same link. Catches resent alerts and
+                    # rows from the old pipeline regardless of key format.
+                    if pair in seen_pairs or (url and url in seen_urls):
                         summary["duplicates"] += 1
                         continue
-                    if session.get(Job, key):
-                        summary["duplicates"] += 1
-                        continue
-                    seen_keys.add(key)
+                    seen_pairs.add(pair)
                     if url:
                         seen_urls.add(url)
 
