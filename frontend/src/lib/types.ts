@@ -40,6 +40,7 @@ export interface Job {
   raw_status: string | null;
   match_pct: number | null;
   llm_match_pct: number | null;
+  semantic_score: number | null;
   compare_score: number | null;
   compare_at: string | null;
   job_description: string | null;
@@ -65,6 +66,18 @@ export interface Settings {
   min_match_score: number | null;
   title_keywords: string[];
   exclude_companies: string[];
+}
+
+export interface SemanticStatus {
+  running: boolean;
+  total: number;
+  done: number;
+  scored: number;
+  no_jd: number;
+  eligible: number;
+  available: boolean;
+  last_error: string | null;
+  last_run_iso: string | null;
 }
 
 export interface ApplyStatus {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Save, RefreshCw, Check, AlertCircle, SlidersHorizontal } from "lucide-react";
 import { api } from "../lib/api";
+import { SemanticMatchPanel } from "./SemanticMatchPanel";
 import type { Settings } from "../lib/types";
 
 const EMPTY: Settings = {
@@ -225,6 +226,8 @@ export function SettingsView() {
           )}
         </div>
       )}
+
+      <SemanticMatchPanel />
     </div>
   );
 }

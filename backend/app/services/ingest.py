@@ -25,9 +25,10 @@ from ..database import engine
 from ..logging_config import logger
 from ..models import Job
 from . import gmail_client as gm
+from .alert_parsers import parse_glassdoor, parse_indeed
 from .email_parser import build_payload, is_job_email, norm
-from .gemini_client import parse_tiles, score_job
-from .resume_loader import resume_text
+from .gemini_client import parse_tiles
+from .semantic import score_and_persist
 
 _lock = threading.Lock()
 
@@ -110,7 +111,6 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
             watermark = _watermark(session)
             seen_urls = _existing_urls(session)
             seen_pairs = _existing_pairs(session)
-            resume = resume_text()
             newest_epoch = watermark
 
             msg_ids = gm.list_message_ids(service, label_id, watermark, max_messages)
@@ -131,7 +131,16 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
                 summary["emails_scanned"] += 1
                 newest_epoch = max(newest_epoch, payload.epoch)
 
-                for job in parse_tiles(payload.links):
+                # Deterministic parsers for Indeed (plain text) and Glassdoor
+                # (HTML); LinkedIn/other fall back to the LLM tile extractor.
+                if payload.provider == "Indeed":
+                    jobs = parse_indeed(gm.plain_text_body(full["payload"]))
+                elif payload.provider == "Glassdoor":
+                    jobs = parse_glassdoor(gm.html_body(full["payload"]))
+                else:
+                    jobs = parse_tiles(payload.links)
+
+                for job in jobs:
                     if not job.get("title") or not job.get("company"):
                         continue
                     summary["jobs_found"] += 1
@@ -168,17 +177,14 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
                         ignored=False,
                     )
 
-                    scored = score_job(job, resume)
-                    if scored:
-                        row.llm_match_pct = float(scored.get("match", 0))
-                        row.match_pct = row.llm_match_pct
-                        row.llm_analysis = (scored.get("summary") or "")[:1000]
-                        row.llm_analysis_at = _now_iso()
-                        row.match_scored_at = _now_iso()
-                        summary["scored"] += 1
-
                     session.add(row)
                     summary["new_jobs"] += 1
+                    # Offline semantic match: pull the JD via the link and score
+                    # resume vs JD (skips jobs that already have an LLM score).
+                    status["phase"] = "scoring"
+                    if score_and_persist(session, row):
+                        summary["scored"] += 1
+                    status["scored_so_far"] = summary["scored"]
 
                 session.commit()  # commit per-email so partial runs persist
 

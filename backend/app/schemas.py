@@ -52,6 +52,7 @@ class JobOut(BaseModel):
     raw_status: Optional[str]         # original value stored in the DB
     match_pct: Optional[float]
     llm_match_pct: Optional[float]     # initial score from ingestion
+    semantic_score: Optional[float]   # offline sentence-transformers similarity
     compare_score: Optional[float]    # detailed "Compare with Resume" score
     compare_at: Optional[str]
     job_description: Optional[str]

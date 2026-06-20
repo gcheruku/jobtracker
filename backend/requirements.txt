@@ -14,7 +14,11 @@ python-docx>=1.1
 beautifulsoup4>=4.12
 lxml>=5.2
 requests>=2.31
+pgeocode>=0.4
 APScheduler>=3.10
+
+# Offline semantic resume<->JD matching
+sentence-transformers>=3.0
 
 # Optional: only needed if you set ANTHROPIC_API_KEY for real LLM analysis.
 anthropic>=0.40

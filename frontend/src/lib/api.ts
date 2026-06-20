@@ -8,6 +8,7 @@ import type {
   JobFilters,
   Note,
   Resume,
+  SemanticStatus,
   Settings,
   Stats,
 } from "./types";
@@ -156,6 +157,14 @@ export const api = {
   },
   applyStatus(): Promise<ApplyStatus> {
     return http<ApplyStatus>(`/api/settings/apply-status`);
+  },
+
+  // --- semantic matching ---
+  semanticStatus(): Promise<SemanticStatus> {
+    return http<SemanticStatus>(`/api/semantic/status`);
+  },
+  runSemantic(): Promise<{ started: boolean; detail?: string }> {
+    return http(`/api/semantic/run`, { method: "POST" });
   },
 
   // --- gmail ingest ---

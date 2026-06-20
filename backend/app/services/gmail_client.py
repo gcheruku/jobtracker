@@ -89,14 +89,21 @@ def internal_epoch(full_msg: dict) -> int:
     return int(full_msg.get("internalDate", "0")) // 1000
 
 
-def html_body(payload: dict) -> str:
-    """Depth-first search for the first text/html part."""
-    if payload.get("mimeType") == "text/html" and payload.get("body", {}).get("data"):
-        return base64.urlsafe_b64decode(payload["body"]["data"]).decode(
-            "utf-8", "ignore"
-        )
+def _part_by_mime(payload: dict, mime: str) -> str:
+    if payload.get("mimeType") == mime and payload.get("body", {}).get("data"):
+        return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", "ignore")
     for part in payload.get("parts", []) or []:
-        found = html_body(part)
+        found = _part_by_mime(part, mime)
         if found:
             return found
     return ""
+
+
+def html_body(payload: dict) -> str:
+    """Depth-first search for the first text/html part."""
+    return _part_by_mime(payload, "text/html")
+
+
+def plain_text_body(payload: dict) -> str:
+    """Depth-first search for the first text/plain part (Indeed/LinkedIn alerts)."""
+    return _part_by_mime(payload, "text/plain")

@@ -58,6 +58,7 @@ def _to_out(job: Job) -> JobOut:
         raw_status=job.status,
         match_pct=job.match_pct,
         llm_match_pct=job.llm_match_pct,
+        semantic_score=job.semantic_score,
         compare_score=job.compare_score,
         compare_at=job.compare_at,
         job_description=job.job_description,
