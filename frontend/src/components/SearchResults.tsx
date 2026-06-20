@@ -22,9 +22,12 @@ export function SearchResults({
 }) {
   const qc = useQueryClient();
   const searchKey = ["jobs", "search", filters] as const;
+  // Dashboard search is scoped to the active board only (Saved/Applied/
+  // Interviewing/Offer). Skipped/Rejected/Expired are searched from the
+  // Inactive screen instead.
   const results = useQuery({
     queryKey: searchKey,
-    queryFn: () => api.listJobs({ ...filters, include_ignored: true }),
+    queryFn: () => api.listJobs({ ...filters, board_only: true }),
   });
 
   const refresh = () => {
@@ -62,7 +65,9 @@ export function SearchResults({
           {results.isLoading ? "Searching…" : `${jobs.length} result${jobs.length === 1 ? "" : "s"}`}
           {filters.q ? <span className="font-normal text-slate-400"> for “{filters.q}”</span> : null}
         </h2>
-        <span className="ml-2 text-xs text-slate-400">across all statuses</span>
+        <span className="ml-2 text-xs text-slate-400">
+          on the board · search the Inactive tab for skipped/expired
+        </span>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
