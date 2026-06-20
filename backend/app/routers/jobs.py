@@ -64,6 +64,7 @@ def _to_out(job: Job) -> JobOut:
         email_date=job.email_date,
         status_updated_at=job.status_updated_at,
         ignored=bool(job.ignored),
+        mismatched=bool(job.mismatched),
     )
 
 
@@ -90,6 +91,7 @@ def list_jobs(
         stmt = stmt.where(Job.ignored == True)  # noqa: E712
     elif not include_ignored:
         stmt = stmt.where((Job.ignored == False) | (Job.ignored == None))  # noqa: E711,E712
+        stmt = stmt.where((Job.mismatched == False) | (Job.mismatched == None))  # noqa: E711,E712
 
     if work_mode:
         stmt = stmt.where(Job.work_mode == work_mode)
@@ -105,12 +107,18 @@ def list_jobs(
     jobs = session.exec(stmt).all()
     out = [_to_out(j) for j in jobs]
 
-    # Off-board view: skipped jobs PLUS any job whose status is off the board.
+    # Off-board view: skipped, mismatched, or any off-board status.
     if off_board:
-        out = [j for j in out if j.ignored or j.status in OFF_BOARD_STATUSES]
-    # Active board: non-ignored jobs whose status is an actual board column.
+        out = [
+            j for j in out
+            if j.ignored or j.mismatched or j.status in OFF_BOARD_STATUSES
+        ]
+    # Active board: non-ignored, non-mismatched jobs in a real board column.
     if board_only:
-        out = [j for j in out if not j.ignored and j.status in BOARD_STATUSES]
+        out = [
+            j for j in out
+            if not j.ignored and not j.mismatched and j.status in BOARD_STATUSES
+        ]
 
     # Display-status filter applies after mapping (Viewed->Saved etc.).
     if status:
@@ -220,11 +228,13 @@ def ignore_job(job_key: str, session: Session = Depends(get_session)):
 
 @router.post("/{job_key}/restore", response_model=JobOut)
 def restore_job(job_key: str, session: Session = Depends(get_session)):
-    """Un-ignore. Keeps the job's existing pipeline status intact."""
+    """Bring a job back to the board: clear the skipped and mismatched flags.
+    Keeps the job's existing pipeline status intact."""
     job = session.get(Job, job_key)
     if not job:
         raise HTTPException(404, "Job not found")
     job.ignored = False
+    job.mismatched = False
     session.add(job)
     session.commit()
     session.refresh(job)
@@ -243,15 +253,16 @@ def _delete_with_dependents(session: Session, job: Job) -> None:
 
 @router.post("/bulk-restore")
 def bulk_restore(payload: BulkKeys, session: Session = Depends(get_session)) -> dict:
-    """Restore many jobs to the board: un-ignore skipped ones; move off-board
-    (Rejected/Expired) ones back to Saved."""
+    """Restore many jobs to the board: clear skipped/mismatched flags; move
+    off-board (Rejected/Expired) ones back to Saved."""
     restored = 0
     for key in payload.job_keys:
         job = session.get(Job, key)
         if not job:
             continue
-        if job.ignored:
+        if job.ignored or job.mismatched:
             job.ignored = False
+            job.mismatched = False
         else:
             job.status = PIPELINE_STATUSES[0]  # "Saved"
             job.status_updated_at = _now()

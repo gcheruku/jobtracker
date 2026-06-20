@@ -54,6 +54,20 @@ class Job(SQLModel, table=True):
     compare_score: Optional[float] = None
     compare_analysis: Optional[str] = None  # full CompareResult JSON
     compare_at: Optional[str] = None
+    # Off-board because it doesn't match the user's saved preferences.
+    mismatched: Optional[bool] = Field(default=False)
+
+
+class GeoCache(SQLModel, table=True):
+    """Cached geocoding results so we hit Nominatim once per unique location."""
+
+    __tablename__ = "geo_cache"
+
+    query: str = Field(primary_key=True)
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    found: bool = False
+    created_at: str = Field(default_factory=utcnow_iso)
 
 
 class Note(SQLModel, table=True):

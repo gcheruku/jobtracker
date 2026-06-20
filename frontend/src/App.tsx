@@ -10,6 +10,7 @@ import { JobDrawer } from "./components/JobDrawer";
 import { ActivityLog } from "./components/ActivityLog";
 import { InactiveView } from "./components/InactiveView";
 import { SearchResults } from "./components/SearchResults";
+import { SettingsView } from "./components/SettingsView";
 import { api } from "./lib/api";
 import { BOARD_STATUSES, OFF_BOARD_STATUSES } from "./lib/types";
 import type { Job, JobFilters, PipelineStatus } from "./lib/types";
@@ -32,6 +33,7 @@ export default function App() {
   const boardTotal = BOARD_STATUSES.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
   const inactiveCount =
     (stats.data?.ignored ?? 0) +
+    (stats.data?.mismatched ?? 0) +
     OFF_BOARD_STATUSES.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
 
   const refresh = () => {
@@ -73,12 +75,18 @@ export default function App() {
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <TopBar
-          title={view === "dashboard" ? "Dashboard" : "Inactive jobs"}
+          title={
+            view === "dashboard" ? "Dashboard" : view === "inactive" ? "Inactive jobs" : "Settings"
+          }
           filters={filters}
           setFilters={setFilters}
         />
 
-        {view === "inactive" ? (
+        {view === "settings" ? (
+          <div className="flex-1 overflow-y-auto">
+            <SettingsView />
+          </div>
+        ) : view === "inactive" ? (
           <div className="flex-1 overflow-y-auto">
             <InactiveView filters={filters} />
           </div>

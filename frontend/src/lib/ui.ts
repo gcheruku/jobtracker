@@ -1,7 +1,9 @@
 import type { PipelineStatus } from "./types";
 
+// Keyed by PipelineStatus plus the off-board pseudo-statuses "Skipped" and
+// "Mismatched" shown in the Inactive view.
 export const STATUS_STYLES: Record<
-  PipelineStatus,
+  PipelineStatus | "Skipped" | "Mismatched",
   { dot: string; bar: string; chip: string; text: string }
 > = {
   Saved: { dot: "bg-indigo-500", bar: "bg-indigo-500", chip: "bg-indigo-50 text-indigo-700", text: "text-indigo-600" },
@@ -10,6 +12,10 @@ export const STATUS_STYLES: Record<
   Offer: { dot: "bg-emerald-500", bar: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700", text: "text-emerald-600" },
   Rejected: { dot: "bg-rose-500", bar: "bg-rose-500", chip: "bg-rose-50 text-rose-700", text: "text-rose-600" },
   Expired: { dot: "bg-slate-400", bar: "bg-slate-400", chip: "bg-slate-100 text-slate-600", text: "text-slate-500" },
+  // Skipped by the user.
+  Skipped: { dot: "bg-slate-400", bar: "bg-slate-400", chip: "bg-slate-100 text-slate-600", text: "text-slate-500" },
+  // Off-board because it doesn't match saved preferences.
+  Mismatched: { dot: "bg-violet-400", bar: "bg-violet-400", chip: "bg-violet-50 text-violet-700", text: "text-violet-600" },
 };
 
 export function initials(company: string | null): string {

@@ -1,5 +1,6 @@
 import type {
   AiModels,
+  ApplyStatus,
   ChecklistItem,
   CompareResult,
   IngestStatus,
@@ -7,6 +8,7 @@ import type {
   JobFilters,
   Note,
   Resume,
+  Settings,
   Stats,
 } from "./types";
 
@@ -140,6 +142,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ name, content_text }),
     });
+  },
+
+  // --- settings / preferences ---
+  getSettings(): Promise<Settings> {
+    return http<Settings>(`/api/settings`);
+  },
+  saveSettings(s: Settings): Promise<Settings> {
+    return http<Settings>(`/api/settings`, { method: "PUT", body: JSON.stringify(s) });
+  },
+  applySettings(): Promise<{ started: boolean; detail?: string }> {
+    return http(`/api/settings/apply`, { method: "POST" });
+  },
+  applyStatus(): Promise<ApplyStatus> {
+    return http<ApplyStatus>(`/api/settings/apply-status`);
   },
 
   // --- gmail ingest ---

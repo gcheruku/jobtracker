@@ -46,13 +46,38 @@ export interface Job {
   email_date: string | null;
   status_updated_at: string | null;
   ignored: boolean;
+  mismatched: boolean;
 }
 
 export interface Stats {
   total: number;
   visible: number;
   ignored: number;
+  mismatched: number;
   by_status: Record<string, number>;
+}
+
+export interface Settings {
+  city: string;
+  max_distance_miles: number | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  min_match_score: number | null;
+  title_keywords: string[];
+  exclude_companies: string[];
+}
+
+export interface ApplyStatus {
+  running: boolean;
+  last_summary: {
+    evaluated: number;
+    moved_to_mismatched: number;
+    restored: number;
+    still_mismatched: number;
+    geocode_failures: number;
+  } | null;
+  last_error: string | null;
+  last_run_iso: string | null;
 }
 
 export interface Note {

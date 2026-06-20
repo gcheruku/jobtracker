@@ -7,11 +7,12 @@ import {
   Settings,
 } from "lucide-react";
 
-export type View = "dashboard" | "inactive";
+export type View = "dashboard" | "inactive" | "settings";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "inactive", label: "Inactive", icon: Archive },
+  { id: "settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar({
@@ -63,7 +64,6 @@ export function Sidebar({
             { label: "Applications", icon: Briefcase },
             { label: "Saved", icon: Bookmark },
             { label: "Resume", icon: FileText },
-            { label: "Settings", icon: Settings },
           ].map(({ label, icon: Icon }) => (
             <div
               key={label}

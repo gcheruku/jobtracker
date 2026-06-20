@@ -19,16 +19,24 @@ def stats(session: Session = Depends(get_session)):
     jobs = session.exec(select(Job)).all()
     by_status = {s: 0 for s in PIPELINE_STATUSES}
     ignored = 0
+    mismatched = 0
     visible = 0
     for j in jobs:
         if j.ignored:
             ignored += 1
             continue
+        if j.mismatched:
+            mismatched += 1
+            continue
         visible += 1
         disp = STATUS_DISPLAY_MAP.get(j.status or "", j.status) or PIPELINE_STATUSES[0]
         by_status[disp] = by_status.get(disp, 0) + 1
     return StatsOut(
-        total=len(jobs), visible=visible, ignored=ignored, by_status=by_status
+        total=len(jobs),
+        visible=visible,
+        ignored=ignored,
+        mismatched=mismatched,
+        by_status=by_status,
     )
 
 

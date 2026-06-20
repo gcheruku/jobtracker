@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import CORS_ORIGINS, DATABASE_URL, INGEST_INTERVAL_HOURS, PIPELINE_STATUSES
 from .database import init_db
 from .logging_config import logger, setup_logging
-from .routers import ai, ingest, jobs, resume, stats
+from .routers import ai, ingest, jobs, resume, settings, stats
 from .scheduler import start_scheduler, stop_scheduler
 
 # Configure console logging before anything else emits a record.
@@ -90,3 +90,4 @@ app.include_router(resume.router)
 app.include_router(ai.router)
 app.include_router(stats.router)
 app.include_router(ingest.router)
+app.include_router(settings.router)

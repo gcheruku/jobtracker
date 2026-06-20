@@ -44,6 +44,8 @@ def init_db() -> None:
         _add_column_if_missing(conn, "jobs", "compare_score", "REAL")
         _add_column_if_missing(conn, "jobs", "compare_analysis", "TEXT")
         _add_column_if_missing(conn, "jobs", "compare_at", "TEXT")
+        _add_column_if_missing(conn, "jobs", "mismatched", "INTEGER DEFAULT 0")
+        conn.execute(text("UPDATE jobs SET mismatched = 0 WHERE mismatched IS NULL"))
         # Normalize any NULL ignored values left by older rows.
         conn.execute(text("UPDATE jobs SET ignored = 0 WHERE ignored IS NULL"))
 

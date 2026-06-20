@@ -58,6 +58,7 @@ class JobOut(BaseModel):
     email_date: Optional[str]
     status_updated_at: Optional[str]
     ignored: bool
+    mismatched: bool
 
 
 class NoteIn(BaseModel):
@@ -135,4 +136,25 @@ class StatsOut(BaseModel):
     total: int
     visible: int
     ignored: int
+    mismatched: int = 0
     by_status: dict
+
+
+# --- Preferences / settings ---------------------------------------------------
+
+class Settings(BaseModel):
+    city: str = ""                       # the user's home city for distance
+    max_distance_miles: Optional[float] = None
+    salary_min: Optional[int] = None     # annual
+    salary_max: Optional[int] = None
+    min_match_score: Optional[int] = None
+    title_keywords: List[str] = []       # keep jobs whose title has any of these
+    exclude_companies: List[str] = []
+
+
+class ApplyResult(BaseModel):
+    evaluated: int
+    moved_to_mismatched: int
+    restored: int
+    still_mismatched: int
+    geocode_failures: int

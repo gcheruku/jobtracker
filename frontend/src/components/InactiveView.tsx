@@ -5,13 +5,15 @@ import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import type { Job, JobFilters, PipelineStatus } from "../lib/types";
 
-// The status shown for an inactive job: skipped jobs read as "Skipped",
-// everything else keeps its own status (Rejected / Expired).
+// The status shown for an inactive job: preference mismatches read as
+// "Mismatched", skipped jobs as "Skipped", else their own status.
 function label(job: Job): string {
-  return job.ignored ? "Skipped" : job.status;
+  if (job.mismatched) return "Mismatched";
+  if (job.ignored) return "Skipped";
+  return job.status;
 }
 
-const STATUS_OPTIONS = ["All", "Skipped", "Rejected", "Expired"];
+const STATUS_OPTIONS = ["All", "Skipped", "Mismatched", "Rejected", "Expired"];
 
 export function InactiveView({ filters }: { filters: JobFilters }) {
   const qc = useQueryClient();
@@ -37,10 +39,13 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
     setSelected(new Set());
   };
 
-  // Single-row restore: un-ignore skipped jobs; move off-board ones to Saved.
+  // Single-row restore: clear skipped/mismatched flags; move off-board
+  // (Rejected/Expired) ones to Saved.
   const restoreOne = useMutation({
     mutationFn: (job: Job) =>
-      job.ignored ? api.restoreJob(job.job_key) : api.moveStatus(job.job_key, "Saved"),
+      job.ignored || job.mismatched
+        ? api.restoreJob(job.job_key)
+        : api.moveStatus(job.job_key, "Saved"),
     onSuccess: refresh,
   });
   const removeOne = useMutation({
