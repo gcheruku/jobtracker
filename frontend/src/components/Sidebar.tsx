@@ -17,11 +17,11 @@ const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
 export function Sidebar({
   view,
   setView,
-  inactiveCount,
+  counts,
 }: {
   view: View;
   setView: (v: View) => void;
-  inactiveCount: number;
+  counts: Partial<Record<View, number>>;
 }) {
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -49,9 +49,9 @@ export function Sidebar({
                 <Icon size={18} />
                 {label}
               </span>
-              {id === "inactive" && inactiveCount > 0 && (
+              {counts[id] != null && counts[id]! > 0 && (
                 <span className="rounded-full bg-slate-200 px-2 text-xs text-slate-600">
-                  {inactiveCount}
+                  {counts[id]}
                 </span>
               )}
             </button>

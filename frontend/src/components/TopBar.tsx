@@ -1,4 +1,4 @@
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import type { JobFilters } from "../lib/types";
 import { FetchAlertsButton } from "./FetchAlertsButton";
 
@@ -33,8 +33,17 @@ export function TopBar({
             value={filters.q ?? ""}
             onChange={(e) => setFilters({ ...filters, q: e.target.value })}
             placeholder="Search roles, companies, locations…"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-400 focus:bg-white"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-sm outline-none focus:border-indigo-400 focus:bg-white"
           />
+          {filters.q && (
+            <button
+              onClick={() => setFilters({ ...filters, q: "" })}
+              title="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
 
         <select

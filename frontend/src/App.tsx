@@ -65,7 +65,11 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar view={view} setView={setView} inactiveCount={inactiveCount} />
+      <Sidebar
+        view={view}
+        setView={setView}
+        counts={{ dashboard: boardTotal, inactive: inactiveCount }}
+      />
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <TopBar
