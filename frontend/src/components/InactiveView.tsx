@@ -5,15 +5,14 @@ import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import type { Job, JobFilters, PipelineStatus } from "../lib/types";
 
-// The status shown for an inactive job: preference mismatches read as
-// "Mismatched", skipped jobs as "Skipped", else their own status.
+// The status shown for an inactive job: skipped jobs read as "Skipped", else
+// their own status. (Preference mismatches have their own dedicated view.)
 function label(job: Job): string {
-  if (job.mismatched) return "Mismatched";
   if (job.ignored) return "Skipped";
   return job.status;
 }
 
-const STATUS_OPTIONS = ["All", "Skipped", "Mismatched", "Rejected", "Expired"];
+const STATUS_OPTIONS = ["All", "Skipped", "Rejected", "Expired"];
 
 export function InactiveView({ filters }: { filters: JobFilters }) {
   const qc = useQueryClient();

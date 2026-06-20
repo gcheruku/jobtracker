@@ -66,6 +66,7 @@ def _to_out(job: Job) -> JobOut:
         status_updated_at=job.status_updated_at,
         ignored=bool(job.ignored),
         mismatched=bool(job.mismatched),
+        mismatch_reason=job.mismatch_reason,
     )
 
 
@@ -82,12 +83,13 @@ def list_jobs(
     off_board: bool = Query(
         False, description="only off-board jobs: ignored OR Rejected/Expired"
     ),
+    only_mismatched: bool = Query(False, description="only preference-mismatched jobs"),
     sort: str = Query("recent", description="recent | match | company | title"),
 ):
     stmt = select(Job)
 
-    if off_board:
-        pass  # need ignored + visible off-board jobs; filter in Python below
+    if off_board or only_mismatched:
+        pass  # fetch all; filter precisely in Python below
     elif only_ignored:
         stmt = stmt.where(Job.ignored == True)  # noqa: E712
     elif not include_ignored:
@@ -108,11 +110,15 @@ def list_jobs(
     jobs = session.exec(stmt).all()
     out = [_to_out(j) for j in jobs]
 
-    # Off-board view: skipped, mismatched, or any off-board status.
+    # Mismatched view: preference-mismatched jobs only.
+    if only_mismatched:
+        out = [j for j in out if j.mismatched]
+    # Off-board (Inactive) view: skipped or off-board status, EXCLUDING
+    # mismatched (those have their own view).
     if off_board:
         out = [
             j for j in out
-            if j.ignored or j.mismatched or j.status in OFF_BOARD_STATUSES
+            if not j.mismatched and (j.ignored or j.status in OFF_BOARD_STATUSES)
         ]
     # Active board: non-ignored, non-mismatched jobs in a real board column.
     if board_only:
@@ -236,6 +242,7 @@ def restore_job(job_key: str, session: Session = Depends(get_session)):
         raise HTTPException(404, "Job not found")
     job.ignored = False
     job.mismatched = False
+    job.mismatch_reason = None
     session.add(job)
     session.commit()
     session.refresh(job)
@@ -264,6 +271,7 @@ def bulk_restore(payload: BulkKeys, session: Session = Depends(get_session)) -> 
         if job.ignored or job.mismatched:
             job.ignored = False
             job.mismatched = False
+            job.mismatch_reason = None
         else:
             job.status = PIPELINE_STATUSES[0]  # "Saved"
             job.status_updated_at = _now()

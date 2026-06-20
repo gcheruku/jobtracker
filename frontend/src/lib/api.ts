@@ -45,6 +45,7 @@ export const api = {
     if (filters.include_ignored) p.set("include_ignored", "true");
     if (filters.board_only) p.set("board_only", "true");
     if (filters.off_board) p.set("off_board", "true");
+    if (filters.only_mismatched) p.set("only_mismatched", "true");
     return http<Job[]>(`/api/jobs?${p.toString()}`);
   },
   getJob(k: string): Promise<Job> {
@@ -163,8 +164,10 @@ export const api = {
   semanticStatus(): Promise<SemanticStatus> {
     return http<SemanticStatus>(`/api/semantic/status`);
   },
-  runSemantic(): Promise<{ started: boolean; detail?: string }> {
-    return http(`/api/semantic/run`, { method: "POST" });
+  runSemantic(recheck = false): Promise<{ started: boolean; detail?: string }> {
+    return http(`/api/semantic/run${recheck ? "?recheck=true" : ""}`, {
+      method: "POST",
+    });
   },
 
   // --- gmail ingest ---

@@ -48,6 +48,7 @@ export interface Job {
   status_updated_at: string | null;
   ignored: boolean;
   mismatched: boolean;
+  mismatch_reason: string | null;
 }
 
 export interface Stats {
@@ -74,6 +75,7 @@ export interface SemanticStatus {
   done: number;
   scored: number;
   no_jd: number;
+  expired: number;
   eligible: number;
   available: boolean;
   last_error: string | null;
@@ -165,4 +167,5 @@ export interface JobFilters {
   include_ignored?: boolean;
   board_only?: boolean;
   off_board?: boolean;
+  only_mismatched?: boolean;
 }

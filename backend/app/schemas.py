@@ -60,6 +60,7 @@ class JobOut(BaseModel):
     status_updated_at: Optional[str]
     ignored: bool
     mismatched: bool
+    mismatch_reason: Optional[str]
 
 
 class NoteIn(BaseModel):

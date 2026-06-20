@@ -22,9 +22,11 @@ def status(session: Session = Depends(get_session)) -> dict:
 
 
 @router.post("/run")
-def run(background_tasks: BackgroundTasks) -> dict:
-    """Score active-board jobs without a match score (skips Inactive jobs)."""
+def run(background_tasks: BackgroundTasks, recheck: bool = False) -> dict:
+    """Score active-board jobs without a match score (skips Inactive jobs).
+    Expired postings are moved off the board. recheck=true also re-processes
+    jobs already attempted (e.g. to catch newly-expired postings)."""
     if backfill_status.get("running"):
         return {"started": False, "detail": "A run is already in progress."}
-    background_tasks.add_task(run_backfill)
+    background_tasks.add_task(run_backfill, recheck)
     return {"started": True}

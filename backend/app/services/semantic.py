@@ -16,7 +16,7 @@ from sqlmodel import Session, select
 from ..config import BOARD_STATUSES, STATUS_DISPLAY_MAP
 from ..logging_config import logger
 from ..models import Job
-from .jd_fetch import fetch_job_description
+from .jd_fetch import fetch_jd_and_expiry
 from .resume_loader import resume_text
 
 _MODEL_NAME = os.environ.get("SEMANTIC_MODEL", "all-MiniLM-L6-v2")
@@ -79,33 +79,46 @@ def has_llm_score(job: Job) -> bool:
     return job.llm_match_pct is not None or job.compare_score is not None
 
 
-def score_and_persist(session: Session, job: Job) -> bool:
-    """Fetch the JD via the job's link if needed, compute the semantic score, and
-    store it. Skips jobs that already have an LLM score. Records the attempt
-    (even on failure) so un-scorable jobs aren't retried/counted forever.
-    Returns True if a score was produced."""
+def score_and_persist(session: Session, job: Job) -> str:
+    """Fetch the JD via the job's link, detect expiry, and score.
+
+    - Expired postings are moved to the "Expired" state (off the board).
+    - Otherwise compute the semantic score from the JD.
+    - The attempt is recorded either way so un-scorable jobs aren't retried.
+    Returns "skipped" | "expired" | "scored" | "no_jd".
+    """
     if has_llm_score(job) or job.semantic_score is not None:
-        return False
+        return "skipped"
     jd = job.job_description or ""
+    expired = False
     if len(jd) < _MIN_JD and job.url:
-        fetched = fetch_job_description(job.url)
+        fetched, expired = fetch_jd_and_expiry(job.url)
         if fetched and len(fetched) >= _MIN_JD:
             jd = fetched
             job.job_description = fetched
     now = datetime.now(timezone.utc).isoformat()
     job.semantic_attempted_at = now
+
+    if expired:
+        job.status = "Expired"  # off-board; surfaces in the Inactive view
+        job.status_updated_at = now
+        session.add(job)
+        return "expired"
+
     score = semantic_score(jd)
     if score is not None:
         job.semantic_score = float(score)
         job.semantic_at = now
+        session.add(job)
+        return "scored"
     session.add(job)
-    return score is not None
+    return "no_jd"
 
 
 # --- batch backfill (board jobs only; Inactive jobs are ignored) --------------
 
 backfill_status: dict = {
-    "running": False, "total": 0, "done": 0, "scored": 0, "no_jd": 0,
+    "running": False, "total": 0, "done": 0, "scored": 0, "no_jd": 0, "expired": 0,
     "last_error": None, "last_run_iso": None,
 }
 _backfill_lock = threading.Lock()
@@ -118,14 +131,16 @@ def _is_active_board(job: Job) -> bool:
     return disp in BOARD_STATUSES
 
 
-def _needs_score(job: Job) -> bool:
-    """Active board job, no score yet, and not already attempted."""
+def _needs_score(job: Job, recheck: bool = False) -> bool:
+    """Active board job without a score and a URL. Normally also skips jobs
+    already attempted; recheck=True re-processes those (e.g. for new expiry
+    detection)."""
     return (
         _is_active_board(job)
         and not has_llm_score(job)
         and job.semantic_score is None
-        and job.semantic_attempted_at is None
         and bool(job.url)
+        and (recheck or job.semantic_attempted_at is None)
     )
 
 
@@ -133,25 +148,34 @@ def eligible_count(session: Session) -> int:
     return sum(1 for j in session.exec(select(Job)).all() if _needs_score(j))
 
 
-def run_backfill() -> None:
-    """Score active-board jobs that lack any match score. Skips Inactive jobs."""
+def run_backfill(recheck: bool = False) -> None:
+    """Score active-board jobs that lack any match score (skips Inactive jobs).
+    Expired postings are moved off the board. recheck=True also re-processes
+    jobs already attempted (e.g. to apply new expiry detection)."""
     if not _backfill_lock.acquire(blocking=False):
         logger.info("Semantic backfill already running")
         return
     from ..database import engine
 
-    backfill_status.update(running=True, done=0, scored=0, no_jd=0, total=0, last_error=None)
+    backfill_status.update(
+        running=True, done=0, scored=0, no_jd=0, expired=0, total=0, last_error=None
+    )
     try:
         with Session(engine) as session:
-            jobs = [j for j in session.exec(select(Job)).all() if _needs_score(j)]
+            jobs = [
+                j for j in session.exec(select(Job)).all() if _needs_score(j, recheck)
+            ]
             backfill_status["total"] = len(jobs)
-            logger.info("Semantic backfill: %d board jobs to score", len(jobs))
+            logger.info("Semantic backfill: %d jobs (recheck=%s)", len(jobs), recheck)
             for job in jobs:
-                if score_and_persist(session, job):
+                result = score_and_persist(session, job)
+                if result == "scored":
                     backfill_status["scored"] += 1
+                elif result == "expired":
+                    backfill_status["expired"] += 1
                 else:
-                    backfill_status["no_jd"] += 1  # attempted, no fetchable JD
-                session.commit()  # persist score or the attempt marker
+                    backfill_status["no_jd"] += 1
+                session.commit()  # persist score / status / attempt marker
                 backfill_status["done"] += 1
         backfill_status["last_run_iso"] = datetime.now(timezone.utc).isoformat()
     except Exception as exc:

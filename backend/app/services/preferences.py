@@ -85,7 +85,7 @@ def job_matches(
 
     # Distance (non-remote only)
     if s.city and s.max_distance_miles and user_coord and not is_remote(job.location):
-        coord = geocode(session, job.location)
+        coord = geocode(session, _geo_query(job.location, _home_state(s.city)))
         if coord:
             miles = haversine_miles(user_coord, coord)
             if miles > s.max_distance_miles:
@@ -110,6 +110,21 @@ def job_matches(
             return False, "excluded company"
 
     return True, ""
+
+
+def _home_state(city: str) -> str:
+    """Two-letter state from the home city, e.g. 'Irving, TX' -> 'TX'."""
+    m = re.search(r",\s*([A-Za-z]{2})\b", city or "")
+    return m.group(1).upper() if m else ""
+
+
+def _geo_query(location: str, home_state: str) -> str:
+    """Bias a state-less city to the home state so bare names like 'Frisco'
+    resolve to the local one (Frisco, TX) instead of a same-named city elsewhere."""
+    loc = (location or "").strip()
+    if home_state and loc and not re.search(r",\s*[A-Za-z]{2}\b", loc):
+        return f"{loc}, {home_state}"
+    return loc
 
 
 def _is_saved(job: Job) -> bool:
@@ -142,7 +157,7 @@ def apply_preferences(session: Session, s: Settings) -> dict:
         "geocode_failures": geocode_failures,
     }
     for job in candidates:
-        matches, _ = job_matches(session, job, s, user_coord)
+        matches, reason = job_matches(session, job, s, user_coord)
         was = bool(job.mismatched)
         now = not matches
         if now and not was:
@@ -152,6 +167,7 @@ def apply_preferences(session: Session, s: Settings) -> dict:
         elif now and was:
             summary["still_mismatched"] += 1
         job.mismatched = now
+        job.mismatch_reason = reason if now else None
         session.add(job)
     session.commit()
     logger.info("Applied preferences: %s", summary)

@@ -9,6 +9,7 @@ import { KanbanBoard } from "./components/KanbanBoard";
 import { JobDrawer } from "./components/JobDrawer";
 import { ActivityLog } from "./components/ActivityLog";
 import { InactiveView } from "./components/InactiveView";
+import { MismatchedView } from "./components/MismatchedView";
 import { SearchResults } from "./components/SearchResults";
 import { SettingsView } from "./components/SettingsView";
 import { api } from "./lib/api";
@@ -31,9 +32,9 @@ export default function App() {
   const searching = (filters.q ?? "").trim() !== "";
   const byStatus = stats.data?.by_status ?? {};
   const boardTotal = BOARD_STATUSES.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
+  const mismatchedCount = stats.data?.mismatched ?? 0;
   const inactiveCount =
     (stats.data?.ignored ?? 0) +
-    (stats.data?.mismatched ?? 0) +
     OFF_BOARD_STATUSES.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
 
   const refresh = () => {
@@ -70,13 +71,23 @@ export default function App() {
       <Sidebar
         view={view}
         setView={setView}
-        counts={{ dashboard: boardTotal, inactive: inactiveCount }}
+        counts={{
+          dashboard: boardTotal,
+          mismatched: mismatchedCount,
+          inactive: inactiveCount,
+        }}
       />
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <TopBar
           title={
-            view === "dashboard" ? "Dashboard" : view === "inactive" ? "Inactive jobs" : "Settings"
+            view === "dashboard"
+              ? "Dashboard"
+              : view === "mismatched"
+                ? "Mismatched jobs"
+                : view === "inactive"
+                  ? "Inactive jobs"
+                  : "Settings"
           }
           filters={filters}
           setFilters={setFilters}
@@ -85,6 +96,10 @@ export default function App() {
         {view === "settings" ? (
           <div className="flex-1 overflow-y-auto">
             <SettingsView />
+          </div>
+        ) : view === "mismatched" ? (
+          <div className="flex-1 overflow-y-auto">
+            <MismatchedView filters={filters} />
           </div>
         ) : view === "inactive" ? (
           <div className="flex-1 overflow-y-auto">

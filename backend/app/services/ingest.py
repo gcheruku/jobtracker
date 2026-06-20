@@ -182,7 +182,7 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
                     # Offline semantic match: pull the JD via the link and score
                     # resume vs JD (skips jobs that already have an LLM score).
                     status["phase"] = "scoring"
-                    if score_and_persist(session, row):
+                    if score_and_persist(session, row) == "scored":
                         summary["scored"] += 1
                     status["scored_so_far"] = summary["scored"]
 

@@ -59,9 +59,28 @@ def _linkedin_guest_url(url: str) -> str | None:
     return f"https://www.linkedin.com/jobs/view/{m.group(1)}" if m else None
 
 
-def fetch_job_description(url: str | None, timeout: int = 25) -> str:
+# Phrases that appear near the top of an expired/closed posting.
+_EXPIRY_MARKERS = (
+    "no longer accepting applications",       # LinkedIn
+    "job expired", "this job has expired", "this job is expired",  # Glassdoor/Indeed
+    "this job has been removed", "no longer available",
+    "applications are no longer being accepted", "posting has expired",
+    "this position has been filled", "no longer active",
+)
+
+
+def _is_expired(html: str) -> bool:
+    """True if an expiry banner appears near the top of the page."""
+    soup = BeautifulSoup(html, "lxml")
+    top = soup.get_text(" ", strip=True)[:4000].lower()
+    return any(marker in top for marker in _EXPIRY_MARKERS)
+
+
+def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
+    """Return (job_description, expired). expired=True if the posting page shows
+    an expiry/closed banner near the top."""
     if not url:
-        return ""
+        return "", False
     targets: list[str] = []
     if "linkedin" in url.lower():
         guest = _linkedin_guest_url(url)
@@ -79,10 +98,16 @@ def fetch_job_description(url: str | None, timeout: int = 25) -> str:
             )
             if resp.status_code >= 400:
                 continue
+            expired = _is_expired(resp.text)
             desc = _extract(resp.text)
             if desc:
                 logger.info("Fetched JD (%d chars) from %s", len(desc), target[:60])
-                return desc
+            if desc or expired:
+                return desc, expired
         except Exception as exc:
             logger.warning("JD fetch failed for %s: %s", target[:60], exc)
-    return ""
+    return "", False
+
+
+def fetch_job_description(url: str | None, timeout: int = 25) -> str:
+    return fetch_jd_and_expiry(url, timeout)[0]

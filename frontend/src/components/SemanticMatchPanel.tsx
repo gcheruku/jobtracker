@@ -19,7 +19,7 @@ export function SemanticMatchPanel() {
   });
 
   const run = useMutation({
-    mutationFn: api.runSemantic,
+    mutationFn: (recheck: boolean) => api.runSemantic(recheck),
     onSuccess: () => setPolling(true),
   });
 
@@ -59,7 +59,7 @@ export function SemanticMatchPanel() {
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <Loader2 size={15} className="animate-spin text-indigo-600" />
             Scoring {s?.done ?? 0} / {s?.total ?? 0} · {s?.scored ?? 0} scored ·{" "}
-            {s?.no_jd ?? 0} no description
+            {s?.expired ?? 0} expired · {s?.no_jd ?? 0} no description
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
             <div
@@ -72,13 +72,21 @@ export function SemanticMatchPanel() {
           </p>
         </div>
       ) : (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={() => run.mutate()}
+            onClick={() => run.mutate(false)}
             disabled={!s?.available || (s?.eligible ?? 0) === 0}
             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             <Play size={15} /> Run semantic matching
+          </button>
+          <button
+            onClick={() => run.mutate(true)}
+            disabled={!s?.available}
+            title="Re-check all unscored active jobs, moving expired postings off the board"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Re-check / expired
           </button>
           <span className="text-xs text-slate-500">
             {s?.eligible ?? 0} job{(s?.eligible ?? 0) === 1 ? "" : "s"} to score
@@ -86,7 +94,8 @@ export function SemanticMatchPanel() {
           {s?.last_run_iso && !s.last_error && (s?.eligible ?? 0) >= 0 && (
             <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
               <Check size={13} /> last run scored {s.scored}
-              {s.no_jd ? ` · ${s.no_jd} had no description` : ""}
+              {s.expired ? ` · ${s.expired} expired` : ""}
+              {s.no_jd ? ` · ${s.no_jd} no description` : ""}
             </span>
           )}
         </div>

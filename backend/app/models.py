@@ -56,6 +56,7 @@ class Job(SQLModel, table=True):
     compare_at: Optional[str] = None
     # Off-board because it doesn't match the user's saved preferences.
     mismatched: Optional[bool] = Field(default=False)
+    mismatch_reason: Optional[str] = None  # why it was mismatched (for the view)
     # Offline sentence-transformers resume<->JD similarity (0-100).
     semantic_score: Optional[float] = None
     semantic_at: Optional[str] = None
