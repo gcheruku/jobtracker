@@ -51,7 +51,9 @@ class JobOut(BaseModel):
     status: Optional[str]              # display status (mapped to a pipeline column)
     raw_status: Optional[str]         # original value stored in the DB
     match_pct: Optional[float]
-    llm_match_pct: Optional[float]
+    llm_match_pct: Optional[float]     # initial score from ingestion
+    compare_score: Optional[float]    # detailed "Compare with Resume" score
+    compare_at: Optional[str]
     job_description: Optional[str]
     email_date: Optional[str]
     status_updated_at: Optional[str]
@@ -105,26 +107,28 @@ class ResumeTextIn(BaseModel):
 # --- AI compare ---------------------------------------------------------------
 
 class CompareRequest(BaseModel):
-    # Either reference a stored resume or paste text inline.
+    # Resume source: inline text > referenced id > active resume.
     resume_id: Optional[int] = None
     resume_text: Optional[str] = None
-
-
-class KeywordChip(BaseModel):
-    label: str
-    matched: bool
+    model: Optional[str] = None        # override the Gemini model for this run
+    force: bool = False                # re-run even if a saved analysis exists
 
 
 class CompareResult(BaseModel):
     job_key: str
-    match_score: int                  # 0-100
-    matched_keywords: List[str]
-    missing_keywords: List[str]
-    keyword_chips: List[KeywordChip]
-    interview_questions: List[str]
-    resume_tips: List[str]
-    summary: str
-    source: str                       # "llm" | "heuristic-stub"
+    match_score: int                   # 0-100, contextual fit
+    report_markdown: str               # full Markdown analysis (4 sections)
+    used_job_description: bool          # was a real JD available for the analysis
+    model: str                         # which model produced it
+    source: str                        # "gemini" | "heuristic-stub"
+    created_at: str
+    cached: bool = False               # true if returned from saved analysis
+
+
+class ModelsOut(BaseModel):
+    enabled: bool                      # is a Gemini API key configured
+    default: str
+    models: List[str]
 
 
 class StatsOut(BaseModel):

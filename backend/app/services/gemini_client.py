@@ -6,6 +6,7 @@ extraction returns [] and scoring returns None, so ingestion still records jobs.
 from __future__ import annotations
 
 import json
+import re
 from typing import List, Optional
 
 from ..config import GEMINI_MODEL, GOOGLE_API_KEY
@@ -26,16 +27,110 @@ def _get_client():
     return _client
 
 
-def _gen_json(prompt: str, open_ch: str, close_ch: str):
+def _gen_json(prompt: str, open_ch: str, close_ch: str, model: str | None = None):
     client = _get_client()
     if client is None:
         return None
-    resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    resp = client.models.generate_content(model=model or GEMINI_MODEL, contents=prompt)
     raw = resp.text or ""
     start, end = raw.find(open_ch), raw.rfind(close_ch)
     if start == -1 or end == -1:
         raise ValueError("no JSON found in model response")
     return json.loads(raw[start : end + 1])
+
+
+def list_models() -> list[str]:
+    """Available Gemini models that support content generation."""
+    client = _get_client()
+    if client is None:
+        return []
+    try:
+        out = []
+        for m in client.models.list():
+            name = (m.name or "").replace("models/", "")
+            actions = getattr(m, "supported_actions", None) or getattr(
+                m, "supported_generation_methods", None
+            ) or []
+            if "gemini" in name and (not actions or "generateContent" in actions):
+                out.append(name)
+        # Stable, useful-first ordering.
+        preferred = [
+            "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash",
+            "gemini-1.5-pro", "gemini-1.5-flash",
+        ]
+        ranked = [m for m in preferred if m in out] + sorted(
+            m for m in out if m not in preferred
+        )
+        return ranked
+    except Exception as exc:
+        logger.warning("Could not list Gemini models: %s", exc)
+        return []
+
+
+# Prompt for the detailed "Compare with Resume" analysis. Produces a rich
+# Markdown report (rendered in the UI) prefixed with a parseable SCORE line.
+_FIT_PROMPT = """You are an expert technical recruiter and an advanced Applicant \
+Tracking System (ATS). Analyze the following Resume against the Job Description. \
+Be specific and evidence-based: cite actual phrases from the resume and the job \
+description. Do NOT invent experience the resume does not show.
+
+Scoring guidance: score primarily on whether the candidate CAN do the job — \
+coverage of the required skills and whether their experience depth meets or \
+exceeds the requirements. A candidate who clearly meets or exceeds the core \
+requirements should score 80-95. Treat over-qualification, short tenures, minor \
+keyword gaps, or location as MINOR deductions (a few points each), not major \
+penalties. Reserve scores below 50 for candidates genuinely lacking the core \
+required skills or experience.
+
+First, output a single line exactly in this format (nothing before it):
+SCORE: <integer 0-100>
+
+Then provide a detailed analysis in GitHub-flavored Markdown with these sections:
+
+## 1. Contextual Match Score
+State the score as a percentage and justify it in a short paragraph based on \
+skills, experience depth, and seniority alignment.
+
+## 2. Keyword & Skills Alignment
+What matches (cite specific resume phrases and the JD requirements they satisfy) \
+and what critical/required skills are missing or flagged.
+
+## 3. Experience & Red Flags Gap Analysis
+Analyze whether the depth and seniority of experience truly fit. Call out red \
+flags (over- or under-qualification, short tenures, domain switch, location \
+mismatch, missing required keywords).
+
+## 4. Actionable Bullet Point Improvements
+Rewrite 2-3 existing resume bullet points to mirror key verbs/metrics from the \
+JD WITHOUT fabricating data. Show the **Original** and the **Improved** version.
+
+[JOB DESCRIPTION]
+{job}
+
+[RESUME]
+{resume}
+"""
+
+_SCORE_RE = re.compile(r"SCORE:\s*(\d{1,3})", re.IGNORECASE)
+
+
+def analyze_fit(job_text: str, resume_text: str, model: str | None = None) -> Optional[dict]:
+    """Markdown resume-vs-job fit analysis via Gemini. None if unavailable."""
+    if _get_client() is None or not resume_text:
+        return None
+    client = _get_client()
+    prompt = _FIT_PROMPT.format(job=job_text[:12000], resume=resume_text[:9000])
+    resp = client.models.generate_content(model=model or GEMINI_MODEL, contents=prompt)
+    raw = (resp.text or "").strip()
+    if not raw:
+        return None
+
+    m = _SCORE_RE.search(raw)
+    score = int(m.group(1)) if m else 0
+    # Drop the SCORE: line and any stray code-fence wrapper from the markdown.
+    md = _SCORE_RE.sub("", raw, count=1)
+    md = re.sub(r"^```(?:markdown)?\s*|\s*```$", "", md.strip()).strip()
+    return {"match_score": max(0, min(100, score)), "report_markdown": md}
 
 
 def extract_jobs(payload: EmailPayload) -> List[dict]:

@@ -50,6 +50,10 @@ class Job(SQLModel, table=True):
     ignored: Optional[bool] = Field(default=False)
     # Remote / Hybrid / On-site — powers the Work Mode filter.
     work_mode: Optional[str] = None
+    # Detailed "Compare with Resume" analysis (persisted so it's viewable later).
+    compare_score: Optional[float] = None
+    compare_analysis: Optional[str] = None  # full CompareResult JSON
+    compare_at: Optional[str] = None
 
 
 class Note(SQLModel, table=True):

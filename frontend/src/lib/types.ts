@@ -40,6 +40,8 @@ export interface Job {
   raw_status: string | null;
   match_pct: number | null;
   llm_match_pct: number | null;
+  compare_score: number | null;
+  compare_at: string | null;
   job_description: string | null;
   email_date: string | null;
   status_updated_at: string | null;
@@ -69,21 +71,21 @@ export interface ChecklistItem {
   position: number;
 }
 
-export interface KeywordChip {
-  label: string;
-  matched: boolean;
-}
-
 export interface CompareResult {
   job_key: string;
   match_score: number;
-  matched_keywords: string[];
-  missing_keywords: string[];
-  keyword_chips: KeywordChip[];
-  interview_questions: string[];
-  resume_tips: string[];
-  summary: string;
+  report_markdown: string;
+  used_job_description: boolean;
+  model: string;
   source: string;
+  created_at: string;
+  cached: boolean;
+}
+
+export interface AiModels {
+  enabled: boolean;
+  default: string;
+  models: string[];
 }
 
 export interface Resume {

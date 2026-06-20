@@ -2,18 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, MapPin, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
+import { MatchBadge } from "./MatchBadge";
 import type { Job, JobFilters, PipelineStatus } from "../lib/types";
 
 function statusLabel(job: Job): string {
   return job.ignored ? "Skipped" : job.status;
-}
-
-function MatchBadge({ job }: { job: Job }) {
-  const pct = job.llm_match_pct ?? job.match_pct;
-  if (pct == null) return null;
-  const color =
-    pct >= 75 ? "bg-emerald-100 text-emerald-700" : pct >= 40 ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500";
-  return <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${color}`}>{Math.round(pct)}%</span>;
 }
 
 /**

@@ -1,4 +1,5 @@
 import type {
+  AiModels,
   ChecklistItem,
   CompareResult,
   IngestStatus,
@@ -149,11 +150,20 @@ export const api = {
     return http<IngestStatus>(`/api/ingest/status`);
   },
 
-  // --- ai ---
-  compare(k: string, resume_text?: string): Promise<CompareResult> {
+  // --- ai compare ---
+  aiModels(): Promise<AiModels> {
+    return http<AiModels>(`/api/ai/models`);
+  },
+  getCompare(k: string): Promise<CompareResult | null> {
+    return http<CompareResult | null>(`/api/ai/compare/${key(k)}`);
+  },
+  runCompare(
+    k: string,
+    opts: { force?: boolean; model?: string } = {}
+  ): Promise<CompareResult> {
     return http<CompareResult>(`/api/ai/compare/${key(k)}`, {
       method: "POST",
-      body: JSON.stringify(resume_text ? { resume_text } : {}),
+      body: JSON.stringify(opts),
     });
   },
 };

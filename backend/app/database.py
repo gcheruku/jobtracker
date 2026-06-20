@@ -41,6 +41,9 @@ def init_db() -> None:
         # Additive columns on the existing jobs table.
         _add_column_if_missing(conn, "jobs", "ignored", "INTEGER DEFAULT 0")
         _add_column_if_missing(conn, "jobs", "work_mode", "TEXT")
+        _add_column_if_missing(conn, "jobs", "compare_score", "REAL")
+        _add_column_if_missing(conn, "jobs", "compare_analysis", "TEXT")
+        _add_column_if_missing(conn, "jobs", "compare_at", "TEXT")
         # Normalize any NULL ignored values left by older rows.
         conn.execute(text("UPDATE jobs SET ignored = 0 WHERE ignored IS NULL"))
 
