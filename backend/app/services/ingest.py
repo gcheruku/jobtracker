@@ -25,8 +25,8 @@ from ..database import engine
 from ..logging_config import logger
 from ..models import Job
 from . import gmail_client as gm
-from .email_parser import build_payload, is_job_email, match_link, norm
-from .gemini_client import extract_jobs, score_job
+from .email_parser import build_payload, is_job_email, norm
+from .gemini_client import parse_tiles, score_job
 from .resume_loader import resume_text
 
 _lock = threading.Lock()
@@ -125,17 +125,15 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
                 summary["emails_scanned"] += 1
                 newest_epoch = max(newest_epoch, payload.epoch)
 
-                for job in extract_jobs(payload):
+                for job in parse_tiles(payload.links):
                     if not job.get("title") or not job.get("company"):
                         continue
                     summary["jobs_found"] += 1
                     key = _job_key(payload.provider, job)
                     pair = (norm(job.get("title")), norm(job.get("company")))
-                    # Recover a URL the LLM may have missed by matching the email
-                    # links against the job title.
-                    url = (job.get("url") or "").strip() or (
-                        match_link(job.get("title", ""), payload.links) or ""
-                    )
+                    # URL comes from the same tile the fields were parsed from,
+                    # so title/company/location and the link are always consistent.
+                    url = (job.get("url") or "").strip()
                     # Dedup against everything already in the DB: same job
                     # (title|company) OR same link. Catches resent alerts and
                     # rows from the old pipeline regardless of key format.

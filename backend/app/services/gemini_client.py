@@ -61,6 +61,38 @@ def extract_jobs(payload: EmailPayload) -> List[dict]:
         return []
 
 
+def parse_tiles(tiles: List[dict]) -> List[dict]:
+    """Parse each job tile's text into structured fields, keeping its own URL.
+
+    `tiles` is [{url, text}] where each text is the DOM block for ONE job, so the
+    parsed title/company/location/salary and the URL all come from the same
+    listing — no cross-job misassignment. Non-job tiles are dropped by the model.
+    """
+    if _get_client() is None or not tiles:
+        return []
+    items = [{"i": i, "text": t["text"]} for i, t in enumerate(tiles)]
+    prompt = (
+        "Each item below is the text of ONE job listing from an alert email. "
+        "For each REAL job, return an object "
+        '{"i":int,"title","company","location","salary"} parsed from that item\'s '
+        "text, keeping the same i. Omit items that are not real postings (saved-"
+        'search headers, "see more", ads). Use "" for unknown fields. '
+        "Return ONLY a minified JSON array.\n\n" + json.dumps(items)
+    )
+    try:
+        data = _gen_json(prompt, "[", "]")
+        out: List[dict] = []
+        for d in data or []:
+            i = d.get("i")
+            if isinstance(i, int) and 0 <= i < len(tiles) and d.get("title"):
+                d["url"] = tiles[i]["url"]
+                out.append(d)
+        return out
+    except Exception as exc:
+        logger.warning("Gemini tile parse failed: %s", exc)
+        return []
+
+
 def score_job(job: dict, resume: str) -> Optional[dict]:
     """Return {match:int, matched:[], missing:[], summary:str} or None."""
     if _get_client() is None or not resume:

@@ -1,13 +1,16 @@
-"""One-time backfill: recover missing posting URLs on existing jobs.
+"""Recover / correct posting URLs on existing jobs.
 
-For jobs already in the DB without a `url`, re-scan recent Job-alert emails,
-collect their candidate links, and match each URL-less job to a link by title
-(same logic the live ingest now uses). Glassdoor alerts are image-based with no
-title anchors, so those generally can't be recovered — this mostly helps
-LinkedIn/Indeed/Dice rows.
+Re-scans recent Job-alert emails, builds each job link's tile text, and matches
+every job to a URL by title+company (the same content-based logic the live
+ingest uses). Two modes:
 
-Run:  python -m app.services.backfill_urls            # default: last 7 days
-      python -m app.services.backfill_urls 14 300     # days, max messages
+  * default: only fill jobs that currently have no URL.
+  * recompute: also re-derive URLs for jobs that already have one and overwrite
+    when a confident match is found — used to fix earlier order-misassigned URLs.
+
+Run:  python -m app.services.backfill_urls                 # fill missing, 7 days
+      python -m app.services.backfill_urls 14 400          # days, max messages
+      python -m app.services.backfill_urls 14 400 recompute  # also fix wrong URLs
 """
 from __future__ import annotations
 
@@ -22,11 +25,11 @@ from ..database import engine
 from ..logging_config import logger, setup_logging
 from ..models import Job
 from . import gmail_client as gm
-from .email_parser import build_payload, match_link, norm
+from .email_parser import build_payload, match_tile
 
 
 def _collect_links(days: int, max_messages: int):
-    """Return {provider: [links]} gathered from recent Job-alert emails."""
+    """Return {provider: [links]} (links carry tile text) from recent emails."""
     service = gm.get_service()
     label_id = gm.get_label_id(service, GMAIL_LABEL)
     if not label_id:
@@ -36,48 +39,58 @@ def _collect_links(days: int, max_messages: int):
     msg_ids = gm.list_message_ids(service, label_id, after, max_messages)
     logger.info("Backfill: scanning %d recent emails (last %dd)", len(msg_ids), days)
 
-    links_by_provider: dict[str, list] = defaultdict(list)
+    by_provider: dict[str, list] = defaultdict(list)
     for msg_id in msg_ids:
         payload = build_payload(gm.fetch_message(service, msg_id))
-        links_by_provider[payload.provider].extend(payload.links)
-    return links_by_provider
+        by_provider[payload.provider].extend(payload.links)
+    return by_provider
 
 
-def backfill_urls(days: int = 7, max_messages: int = 200) -> dict:
-    links_by_provider = _collect_links(days, max_messages)
-    all_links = [l for links in links_by_provider.values() for l in links]
+def backfill_urls(days: int = 7, max_messages: int = 200, recompute: bool = False) -> dict:
+    by_provider = _collect_links(days, max_messages)
+    all_links = [l for links in by_provider.values() for l in links]
 
-    summary = {"url_less_rows": 0, "updated": 0, "skipped_no_match": 0}
+    summary = {"considered": 0, "filled": 0, "corrected": 0, "unchanged": 0}
     with Session(engine) as session:
-        # URLs already in use, so we never assign a link to two different jobs.
-        used_urls = {
-            u[0]
-            for u in session.exec(
-                select(Job.url).where(Job.url.is_not(None))  # type: ignore[union-attr]
+        rows = (
+            session.exec(select(Job)).all()
+            if recompute
+            else session.exec(
+                select(Job).where((Job.url == None) | (Job.url == ""))  # noqa: E711
             ).all()
-            if u and u[0]
-        }
+        )
+        # URLs already correctly in use, so we don't assign one to two jobs.
+        used = {j.url for j in session.exec(select(Job)).all() if j.url}
 
-        url_less = session.exec(
-            select(Job).where((Job.url == None) | (Job.url == ""))  # noqa: E711
-        ).all()
-
-        for job in url_less:
-            if not job.title:
+        for job in rows:
+            if not job.title or not job.company:
                 continue
-            summary["url_less_rows"] += 1
-            # Prefer links from the same provider, fall back to all links.
-            candidates = links_by_provider.get(job.source or "", []) or all_links
-            url = match_link(job.title, candidates) or match_link(job.title, all_links)
-            if url and url not in used_urls:
-                job.url = url
-                used_urls.add(url)
-                session.add(job)
-                summary["updated"] += 1
-                logger.info("Backfilled URL for: %s @ %s", job.title, job.company)
-            else:
-                summary["skipped_no_match"] += 1
-
+            summary["considered"] += 1
+            candidates = by_provider.get(job.source or "", []) or all_links
+            url = match_tile(job.title, job.company, candidates) or match_tile(
+                job.title, job.company, all_links
+            )
+            if not url:
+                summary["unchanged"] += 1
+                continue
+            if url == job.url:
+                summary["unchanged"] += 1
+                continue
+            if url in used and url != job.url:
+                # belongs to another job already; don't duplicate-assign
+                summary["unchanged"] += 1
+                continue
+            had_url = bool(job.url)
+            job.url = url
+            used.add(url)
+            session.add(job)
+            summary["corrected" if had_url else "filled"] += 1
+            logger.info(
+                "%s URL for: %s @ %s",
+                "Corrected" if had_url else "Filled",
+                job.title,
+                job.company,
+            )
         session.commit()
 
     logger.info("Backfill complete: %s", summary)
@@ -88,4 +101,5 @@ if __name__ == "__main__":
     setup_logging()
     days = int(sys.argv[1]) if len(sys.argv) > 1 else 7
     max_msgs = int(sys.argv[2]) if len(sys.argv) > 2 else 200
-    print(backfill_urls(days=days, max_messages=max_msgs))
+    recompute = len(sys.argv) > 3 and sys.argv[3].lower() == "recompute"
+    print(backfill_urls(days=days, max_messages=max_msgs, recompute=recompute))

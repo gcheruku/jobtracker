@@ -1,9 +1,11 @@
 """Turn a raw Gmail job-alert message into a clean payload for the extractor.
 
-We deliberately do NOT hand-write per-provider HTML scrapers (the templates are
-image-heavy and change often). Instead we produce: the subject, a plain-text
-rendering, and the list of candidate job links (anchor text + href) limited to
-the known job domains. The Gemini extractor turns that into structured jobs.
+We deliberately do NOT hand-write per-provider HTML scrapers. Instead, for every
+job-domain link we capture its *tile text* — the text of the smallest DOM block
+that wraps exactly that one job (which contains the title/company/location). The
+Gemini extractor parses the email into structured jobs, and each job's URL is
+then matched to the link whose tile text contains its title+company. This pairs
+URLs by content, never by order, so links can't be shifted/misassigned.
 """
 from __future__ import annotations
 
@@ -35,10 +37,14 @@ _SKIP_SUBJECT_MARKERS = (
 )
 
 _SKIP_LINK_MARKERS = (
-    "unsubscribe", "privacy", "manage", "settings", "terms", "help",
-    "app store", "google play", "premium", "log in", "login", "view all jobs",
-    "view community", "knowledge center", "edit this job alert",
+    "unsubscribe", "privacy policy", "manage settings", "see all jobs",
+    "see more jobs", "view all jobs", "view community", "knowledge center",
+    "edit this job alert", "create job alert", "app store", "google play",
+    "try premium",
 )
+
+# Longest a single job tile's text should be; bounds how far we climb the DOM.
+_TILE_MAX_CHARS = 320
 
 
 @dataclass
@@ -48,35 +54,81 @@ class EmailPayload:
     subject: str
     epoch: int
     text: str
-    links: List[dict] = field(default_factory=list)
+    links: List[dict] = field(default_factory=list)  # {url, text(tile)}
 
 
 def norm(s: Optional[str]) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
 
 
-def match_link(title: str, links: List[dict]) -> Optional[str]:
-    """Deterministically pick the email link for a job by its title.
+def _is_job_anchor(href: str) -> bool:
+    host = urlparse(href).netloc.lower()
+    return any(d in host for d in JOB_DOMAINS)
 
-    Job-alert templates (LinkedIn especially) use the job title as the anchor
-    text, so exact/substring/token-overlap matching recovers URLs the LLM
-    extractor sometimes fails to map.
+
+# Href patterns that identify an actual job-posting link (vs. saved-search
+# headers, "see more jobs", company pages, or other nav).
+_POSTING_PATTERNS = (
+    "joblisting",      # Glassdoor
+    "/jobs/view",      # LinkedIn
+    "/rc/clk", "/viewjob", "jk=", "/pagead/clk",  # Indeed
+    "dice.com/job", "/job-detail", "/jobs/detail",  # Dice
+)
+
+
+def _is_job_posting(href: str) -> bool:
+    if not _is_job_anchor(href):
+        return False
+    h = href.lower()
+    return any(p in h for p in _POSTING_PATTERNS)
+
+
+def _tile_text(anchor) -> str:
+    """Text of the smallest ancestor block that wraps exactly this one job link.
+
+    Climbs parents while the subtree still contains a single job link and stays
+    within a size bound, so the result holds this job's title/company but does
+    not bleed into neighboring tiles.
     """
-    nt = norm(title)
+    chosen = ""
+    node = anchor
+    while node.parent is not None:
+        parent = node.parent
+        job_links = sum(
+            1 for a in parent.find_all("a", href=True) if _is_job_anchor(a["href"])
+        )
+        if job_links > 1:
+            break
+        chosen = parent.get_text(" ", strip=True)
+        if len(chosen) > _TILE_MAX_CHARS:
+            break
+        node = parent
+    return chosen[:_TILE_MAX_CHARS]
+
+
+def match_tile(title: str, company: str, links: List[dict]) -> Optional[str]:
+    """Return the URL whose tile text best matches this job's title (+company).
+
+    Matching is purely by content: the correct tile contains the job's title, so
+    we never rely on the order links appear in the email.
+    """
+    nt, nc = norm(title), norm(company)
     if not nt:
         return None
-    title_tokens = set(nt.split())
+    t_tokens = set(nt.split())
     best_url, best_score = None, 0.0
     for link in links:
         lt = norm(link.get("text"))
         if not lt:
             continue
-        if lt == nt or nt in lt or lt in nt:
-            return link["url"]
-        overlap = len(title_tokens & set(lt.split())) / max(1, len(title_tokens))
-        if overlap > best_score:
-            best_score, best_url = overlap, link["url"]
-    return best_url if best_score >= 0.6 else None
+        title_hit = nt in lt
+        overlap = len(t_tokens & set(lt.split())) / max(1, len(t_tokens))
+        if not title_hit and overlap < 0.8:
+            continue
+        score = (2.0 if title_hit else 0.0) + overlap + (0.6 if nc and nc in lt else 0.0)
+        if score > best_score:
+            best_score, best_url = score, link["url"]
+    return best_url
 
 
 def provider_of(from_header: str) -> str:
@@ -100,17 +152,15 @@ def build_payload(full_msg: dict) -> EmailPayload:
     links: List[dict] = []
     seen_urls = set()
     for a in soup.find_all("a", href=True):
-        text = a.get_text(" ", strip=True)
         href = a["href"]
-        host = urlparse(href).netloc.lower()
-        if not any(d in host for d in JOB_DOMAINS):
+        if not _is_job_posting(href) or href in seen_urls:
             continue
-        if text and any(m in text.lower() for m in _SKIP_LINK_MARKERS):
-            continue
-        if href in seen_urls:
+        tile = _tile_text(a)
+        low = tile.lower()
+        if not tile or any(m in low for m in _SKIP_LINK_MARKERS):
             continue
         seen_urls.add(href)
-        links.append({"text": text[:90], "url": href})
+        links.append({"text": tile, "url": href})
 
     return EmailPayload(
         message_id=header(full_msg, "Message-Id") or full_msg.get("id", ""),
@@ -118,5 +168,5 @@ def build_payload(full_msg: dict) -> EmailPayload:
         subject=subject,
         epoch=internal_epoch(full_msg),
         text=soup.get_text("\n", strip=True)[:6000],
-        links=links[:40],
+        links=links[:60],
     )
