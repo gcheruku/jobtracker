@@ -15,6 +15,7 @@ from sqlmodel import Session, select
 
 from ..config import GEMINI_MODEL, GOOGLE_API_KEY
 from ..database import get_session
+from ..logging_config import logger
 from ..models import Job, Resume
 from ..schemas import CompareRequest, CompareResult, ModelsOut
 from ..services.ai import compute_fit
@@ -106,7 +107,13 @@ def run_compare(
     header = " | ".join(filter(None, [job.title, job.company, job.location, job.salary]))
     job_text = f"{header}\n\n{job.job_description or ''}".strip()
 
-    data = compute_fit(job_text, resume_text, model=payload.model)
+    try:
+        data = compute_fit(job_text, resume_text, model=payload.model)
+    except Exception as exc:
+        logger.exception("Compare failed for %s", job_key)
+        # Don't persist anything on failure — the user can simply retry.
+        raise HTTPException(502, f"AI analysis failed, please try again. ({exc})")
+
     result = CompareResult(
         job_key=job_key,
         used_job_description=used_jd,

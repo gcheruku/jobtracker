@@ -6,7 +6,8 @@ no Google API key is configured.
 """
 from __future__ import annotations
 
-from ..config import GEMINI_MODEL
+from ..config import GEMINI_MODEL, GOOGLE_API_KEY
+from ..logging_config import logger
 from .gemini_client import analyze_fit
 
 _SKILL_VOCAB = [
@@ -50,13 +51,18 @@ def _heuristic_fit(job_text: str, resume_text: str) -> dict:
 
 
 def compute_fit(job_text: str, resume_text: str, model: str | None = None) -> dict:
-    """Return {match_score, report_markdown, model, source}."""
-    try:
-        data = analyze_fit(job_text, resume_text, model=model)
-        if data is not None and data.get("report_markdown"):
-            data["source"] = "gemini"
-            data["model"] = model or GEMINI_MODEL
-            return data
-    except Exception:
-        pass
+    """Return {match_score, report_markdown, model, source}.
+
+    When a Gemini key is configured, a failure RAISES (so the caller can report
+    it and the user can retry) rather than silently caching a heuristic result.
+    The heuristic is only used when genuinely offline (no key).
+    """
+    if GOOGLE_API_KEY:
+        data = analyze_fit(job_text, resume_text, model=model)  # may raise
+        if not data or not data.get("report_markdown"):
+            raise RuntimeError("Gemini returned an empty analysis")
+        data["source"] = "gemini"
+        data["model"] = model or GEMINI_MODEL
+        return data
+    logger.info("No GOOGLE_API_KEY — using offline heuristic for compare")
     return _heuristic_fit(job_text, resume_text)

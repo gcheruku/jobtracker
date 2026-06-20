@@ -116,14 +116,29 @@ _SCORE_RE = re.compile(r"SCORE:\s*(\d{1,3})", re.IGNORECASE)
 
 def analyze_fit(job_text: str, resume_text: str, model: str | None = None) -> Optional[dict]:
     """Markdown resume-vs-job fit analysis via Gemini. None if unavailable."""
-    if _get_client() is None or not resume_text:
-        return None
     client = _get_client()
-    prompt = _FIT_PROMPT.format(job=job_text[:12000], resume=resume_text[:9000])
-    resp = client.models.generate_content(model=model or GEMINI_MODEL, contents=prompt)
-    raw = (resp.text or "").strip()
-    if not raw:
+    if client is None or not resume_text:
         return None
+    prompt = _FIT_PROMPT.format(job=job_text[:12000], resume=resume_text[:9000])
+
+    # Retry transient blips/empty responses (the call can take ~30s).
+    raw, last_exc = "", None
+    for attempt in range(2):
+        try:
+            resp = client.models.generate_content(
+                model=model or GEMINI_MODEL, contents=prompt
+            )
+            raw = (resp.text or "").strip()
+            if raw:
+                break
+            logger.warning("Gemini compare returned empty text (attempt %d)", attempt + 1)
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("Gemini compare attempt %d failed: %s", attempt + 1, exc)
+    if not raw:
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("Gemini returned no text (possibly blocked or truncated)")
 
     m = _SCORE_RE.search(raw)
     score = int(m.group(1)) if m else 0
