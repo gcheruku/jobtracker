@@ -35,6 +35,10 @@ class StatusMove(BaseModel):
     status: str
 
 
+class BulkKeys(BaseModel):
+    job_keys: List[str]
+
+
 class JobOut(BaseModel):
     job_key: str
     title: Optional[str]

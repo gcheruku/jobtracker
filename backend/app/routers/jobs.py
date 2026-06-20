@@ -19,6 +19,7 @@ from ..config import (
 from ..database import get_session
 from ..models import ChecklistItem, Job, Note
 from ..schemas import (
+    BulkKeys,
     ChecklistItemIn,
     ChecklistItemOut,
     ChecklistItemUpdate,
@@ -226,6 +227,49 @@ def restore_job(job_key: str, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(job)
     return _to_out(job)
+
+
+def _delete_with_dependents(session: Session, job: Job) -> None:
+    for note in session.exec(select(Note).where(Note.job_key == job.job_key)).all():
+        session.delete(note)
+    for item in session.exec(
+        select(ChecklistItem).where(ChecklistItem.job_key == job.job_key)
+    ).all():
+        session.delete(item)
+    session.delete(job)
+
+
+@router.post("/bulk-restore")
+def bulk_restore(payload: BulkKeys, session: Session = Depends(get_session)) -> dict:
+    """Restore many jobs to the board: un-ignore skipped ones; move off-board
+    (Rejected/Expired) ones back to Saved."""
+    restored = 0
+    for key in payload.job_keys:
+        job = session.get(Job, key)
+        if not job:
+            continue
+        if job.ignored:
+            job.ignored = False
+        else:
+            job.status = PIPELINE_STATUSES[0]  # "Saved"
+            job.status_updated_at = _now()
+        session.add(job)
+        restored += 1
+    session.commit()
+    return {"restored": restored}
+
+
+@router.post("/bulk-delete")
+def bulk_delete(payload: BulkKeys, session: Session = Depends(get_session)) -> dict:
+    deleted = 0
+    for key in payload.job_keys:
+        job = session.get(Job, key)
+        if not job:
+            continue
+        _delete_with_dependents(session, job)
+        deleted += 1
+    session.commit()
+    return {"deleted": deleted}
 
 
 @router.delete("/{job_key}", status_code=204)

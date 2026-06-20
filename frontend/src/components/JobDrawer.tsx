@@ -88,7 +88,11 @@ export function JobDrawer({
   const ignore = useMutation({
     mutationFn: () => api.ignoreJob(job.job_key),
     onSuccess: () => {
-      onChanged();
+      // Refresh the board/stats but DON'T call onChanged() — it re-fetches this
+      // job and would re-open the drawer right after we close it.
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
       onClose();
     },
   });

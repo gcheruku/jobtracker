@@ -38,6 +38,7 @@ export const api = {
     if (filters.min_salary) p.set("min_salary", String(filters.min_salary));
     if (filters.sort) p.set("sort", filters.sort);
     if (filters.only_ignored) p.set("only_ignored", "true");
+    if (filters.include_ignored) p.set("include_ignored", "true");
     if (filters.board_only) p.set("board_only", "true");
     if (filters.off_board) p.set("off_board", "true");
     return http<Job[]>(`/api/jobs?${p.toString()}`);
@@ -68,6 +69,18 @@ export const api = {
   },
   deleteJob(k: string): Promise<void> {
     return http<void>(`/api/jobs/${key(k)}`, { method: "DELETE" });
+  },
+  bulkRestore(keys: string[]): Promise<{ restored: number }> {
+    return http(`/api/jobs/bulk-restore`, {
+      method: "POST",
+      body: JSON.stringify({ job_keys: keys }),
+    });
+  },
+  bulkDelete(keys: string[]): Promise<{ deleted: number }> {
+    return http(`/api/jobs/bulk-delete`, {
+      method: "POST",
+      body: JSON.stringify({ job_keys: keys }),
+    });
   },
 
   // --- stats / activity ---

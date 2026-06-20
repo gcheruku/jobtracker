@@ -122,6 +122,7 @@ export interface JobFilters {
   min_salary?: number;
   sort?: string;
   only_ignored?: boolean;
+  include_ignored?: boolean;
   board_only?: boolean;
   off_board?: boolean;
 }

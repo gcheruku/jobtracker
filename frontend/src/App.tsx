@@ -9,6 +9,7 @@ import { KanbanBoard } from "./components/KanbanBoard";
 import { JobDrawer } from "./components/JobDrawer";
 import { ActivityLog } from "./components/ActivityLog";
 import { InactiveView } from "./components/InactiveView";
+import { SearchResults } from "./components/SearchResults";
 import { api } from "./lib/api";
 import { BOARD_STATUSES, OFF_BOARD_STATUSES } from "./lib/types";
 import type { Job, JobFilters, PipelineStatus } from "./lib/types";
@@ -26,6 +27,7 @@ export default function App() {
   });
   const stats = useQuery({ queryKey: ["stats"], queryFn: api.stats });
 
+  const searching = (filters.q ?? "").trim() !== "";
   const byStatus = stats.data?.by_status ?? {};
   const boardTotal = BOARD_STATUSES.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
   const inactiveCount =
@@ -75,6 +77,10 @@ export default function App() {
         {view === "inactive" ? (
           <div className="flex-1 overflow-y-auto">
             <InactiveView filters={filters} />
+          </div>
+        ) : searching ? (
+          <div className="flex-1 overflow-y-auto">
+            <SearchResults filters={filters} onOpen={setSelected} />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-6">
