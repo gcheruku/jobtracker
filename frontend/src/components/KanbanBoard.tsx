@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { EyeOff, MapPin } from "lucide-react";
+import { ExternalLink, EyeOff, MapPin } from "lucide-react";
 import { BOARD_STATUSES, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
@@ -52,16 +52,31 @@ function JobCard({
             {job.company || "Unknown company"}
           </div>
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onIgnore(job);
-          }}
-          title="Skip this job"
-          className="opacity-0 transition group-hover:opacity-100"
-        >
-          <EyeOff size={15} className="text-slate-400 hover:text-rose-500" />
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {job.url && (
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              title="Open job posting"
+              className="opacity-0 transition group-hover:opacity-100"
+            >
+              <ExternalLink size={15} className="text-slate-400 hover:text-indigo-600" />
+            </a>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onIgnore(job);
+            }}
+            title="Skip this job"
+            className="opacity-0 transition group-hover:opacity-100"
+          >
+            <EyeOff size={15} className="text-slate-400 hover:text-rose-500" />
+          </button>
+        </div>
       </div>
       <div className="mt-2 flex items-center justify-between">
         <span className="flex items-center gap-1 truncate text-[11px] text-slate-400">

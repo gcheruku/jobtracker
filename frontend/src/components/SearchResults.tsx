@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff, MapPin, Search } from "lucide-react";
+import { ExternalLink, Eye, EyeOff, MapPin, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
@@ -92,6 +92,18 @@ export function SearchResults({
                     {job.company || "Unknown company"}
                   </div>
                 </div>
+                {job.url && (
+                  <a
+                    href={job.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Open job posting"
+                    className="opacity-0 transition group-hover:opacity-100"
+                  >
+                    <ExternalLink size={15} className="text-slate-400 hover:text-indigo-600" />
+                  </a>
+                )}
                 {job.ignored ? (
                   <button
                     onClick={(e) => {
