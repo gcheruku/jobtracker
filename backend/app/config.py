@@ -64,7 +64,7 @@ GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 # Resume used for match scoring during ingestion.
 RESUME_DOCX_PATH = Path(
-    os.environ.get("RESUME_DOCX_PATH", str(REPO_ROOT / "Gopal Cheruku Resume.docx"))
+    os.environ.get("RESUME_DOCX_PATH", str(REPO_ROOT / "Resume.docx"))
 )
 
 # Background fetch cadence and per-run safety cap.
