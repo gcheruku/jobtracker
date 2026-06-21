@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RotateCcw, Trash2, Archive } from "lucide-react";
 import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
+import { SourceTag } from "./SourceTag";
 import type { Job, JobFilters, PipelineStatus } from "../lib/types";
 
 // The status shown for an inactive job: skipped jobs read as "Skipped", else
@@ -145,6 +146,7 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
               </th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Company</th>
+              <th className="px-4 py-3">Source</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -186,6 +188,7 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-slate-500">{j.company}</td>
+                  <td className="px-4 py-3"><SourceTag source={j.source} /></td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
@@ -220,7 +223,7 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
                   No {statusFilter === "All" ? "inactive" : statusFilter.toLowerCase()} jobs.
                 </td>
               </tr>

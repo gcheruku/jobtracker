@@ -4,6 +4,7 @@ import { RotateCcw, Trash2, SlidersHorizontal } from "lucide-react";
 import { api } from "../lib/api";
 import { initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
+import { SourceTag } from "./SourceTag";
 import type { Job, JobFilters } from "../lib/types";
 
 // Map a reason string to a filter category.
@@ -131,6 +132,7 @@ export function MismatchedView({ filters }: { filters: JobFilters }) {
               </th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Company</th>
+              <th className="px-4 py-3">Source</th>
               <th className="px-4 py-3">Location</th>
               <th className="px-4 py-3">Salary</th>
               <th className="px-4 py-3">Match</th>
@@ -164,6 +166,7 @@ export function MismatchedView({ filters }: { filters: JobFilters }) {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-slate-500">{j.company}</td>
+                <td className="px-4 py-3"><SourceTag source={j.source} /></td>
                 <td className="px-4 py-3 text-slate-500">{j.location || "—"}</td>
                 <td className="px-4 py-3 text-emerald-600">{j.salary || "—"}</td>
                 <td className="px-4 py-3"><MatchBadge job={j} /></td>
@@ -182,7 +185,7 @@ export function MismatchedView({ filters }: { filters: JobFilters }) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={9} className="px-4 py-10 text-center text-slate-400">
                   No {reasonFilter === "All" ? "mismatched" : reasonFilter.toLowerCase()} jobs.
                 </td>
               </tr>

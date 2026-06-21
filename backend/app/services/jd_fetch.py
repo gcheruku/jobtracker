@@ -23,8 +23,11 @@ _SELECTORS = [
     ".show-more-less-html__markup",        # LinkedIn guest
     ".description__text",
     "#jobDescriptionText",                  # Indeed
-    ".jobDescriptionContent",               # Glassdoor
+    ".jobDescriptionContent",               # Glassdoor (classic)
     "[data-test=jobDescription]",
+    "[class*=jobDescription]",              # Glassdoor React SPA (JobDetails_jobDescription__…)
+    "[class*=JobDescription]",
+    "[class*=description__]",
 ]
 _MIN_CHARS = 200
 

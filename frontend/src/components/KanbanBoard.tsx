@@ -14,6 +14,7 @@ import { ExternalLink, EyeOff, MapPin } from "lucide-react";
 import { BOARD_STATUSES, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
+import { SourceTag } from "./SourceTag";
 
 function JobCard({
   job,
@@ -78,12 +79,15 @@ function JobCard({
           </button>
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between">
+      <div className="mt-2 flex items-center justify-between gap-1">
         <span className="flex items-center gap-1 truncate text-[11px] text-slate-400">
           {job.location && <MapPin size={12} />}
           {job.work_mode || job.location || ""}
         </span>
-        <MatchBadge job={job} />
+        <span className="flex shrink-0 items-center gap-1.5">
+          <SourceTag source={job.source} />
+          <MatchBadge job={job} />
+        </span>
       </div>
       {job.salary && (
         <div className="mt-1 truncate text-[11px] font-medium text-emerald-600">
