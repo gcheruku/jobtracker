@@ -149,7 +149,18 @@ export function MismatchedView({ filters }: { filters: JobFilters }) {
                     <div className="grid h-7 w-7 shrink-0 place-items-center rounded bg-slate-100 text-[10px] font-bold text-slate-500">
                       {initials(j.company)}
                     </div>
-                    <span className="font-medium">{j.title}</span>
+                    {j.url ? (
+                      <a
+                        href={j.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-indigo-700 hover:underline"
+                      >
+                        {j.title}
+                      </a>
+                    ) : (
+                      <span className="font-medium">{j.title}</span>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-slate-500">{j.company}</td>
