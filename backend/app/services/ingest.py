@@ -14,6 +14,7 @@ scheduler and the manual endpoint, and let the UI poll progress.
 """
 from __future__ import annotations
 
+import re
 import threading
 from datetime import datetime, timezone
 
@@ -50,9 +51,31 @@ def _safe(s: str) -> str:
     return s.replace("/", "-").replace("\\", "-")
 
 
+def canonical_id(url: str | None) -> str | None:
+    """The stable posting id embedded in a job URL (tracking params vary per
+    email, so we key on the id, not the full URL). None if no id is present."""
+    if not url:
+        return None
+    low = url.lower()
+    if "linkedin" in low:
+        m = re.search(r"/jobs/view/(\d+)", low) or re.search(r"currentjobid=(\d+)", low)
+        return f"li-{m.group(1)}" if m else None
+    if "indeed" in low:
+        m = re.search(r"[?&]jk=([0-9a-z]+)", low)
+        return f"in-{m.group(1)}" if m else None
+    if "glassdoor" in low:
+        m = re.search(r"[?&]joblistingid=(\d+)", low)
+        return f"gd-{m.group(1)}" if m else None
+    return None
+
+
 def _job_key(provider: str, job: dict) -> str:
-    """Stable, URL-path-safe identity key. Title|company based so the same job
-    dedups whether or not a URL was captured (URLs vary across resent alerts)."""
+    """Stable identity key. Prefer the posting id from the URL so DISTINCT
+    postings of the same title/company are kept separate; fall back to
+    title|company only when no posting id is available."""
+    cid = canonical_id(job.get("url"))
+    if cid:
+        return f"{provider}:{cid}"
     return f"{provider}:{_safe(norm(job.get('title')))}|{_safe(norm(job.get('company')))}"
 
 
@@ -66,16 +89,22 @@ def _watermark(session: Session) -> int:
     return max(db_max, meta_val)
 
 
-def _existing_urls(session: Session) -> set[str]:
+def _existing_ids(session: Session) -> set[str]:
+    """Canonical posting ids of every job already in the DB (from their URLs).
+    Dedup keys on this so DISTINCT postings of the same role are all kept."""
     rows = session.exec(text("SELECT url FROM jobs WHERE url IS NOT NULL")).all()
-    return {r[0] for r in rows if r[0]}
+    return {cid for r in rows if r[0] and (cid := canonical_id(r[0]))}
 
 
 def _existing_pairs(session: Session) -> set[tuple[str, str]]:
-    """(title, company) identity of every job already in the DB — used to dedup
-    against rows from the old pipeline too (which use different job_key formats)."""
-    rows = session.exec(text("SELECT title, company FROM jobs")).all()
-    return {(norm(r[0]), norm(r[1])) for r in rows if r[0] and r[1]}
+    """(title, company) of jobs WITHOUT a canonical posting id — the fallback
+    dedup for postings whose link carries no id."""
+    rows = session.exec(text("SELECT title, company, url FROM jobs")).all()
+    return {
+        (norm(r[0]), norm(r[1]))
+        for r in rows
+        if r[0] and r[1] and not canonical_id(r[2])
+    }
 
 
 def _save_watermark(session: Session, epoch: int) -> None:
@@ -90,8 +119,14 @@ def _save_watermark(session: Session, epoch: int) -> None:
     session.commit()
 
 
-def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
-    """Synchronous ingest. Returns a summary dict; also stored in `status`."""
+def run_ingest(
+    max_messages: int = INGEST_MAX_MESSAGES, since_epoch: int | None = None
+) -> dict:
+    """Synchronous ingest. Returns a summary dict; also stored in `status`.
+
+    since_epoch overrides the watermark to reprocess older emails (e.g. after a
+    dedup fix); dedup still prevents re-adding jobs already in the DB.
+    """
     if not _lock.acquire(blocking=False):
         logger.info("Ingest already running; skipping this trigger")
         return {"skipped": "already running"}
@@ -108,8 +143,8 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
             raise RuntimeError(f"Gmail label '{GMAIL_LABEL}' not found")
 
         with Session(engine) as session:
-            watermark = _watermark(session)
-            seen_urls = _existing_urls(session)
+            watermark = since_epoch if since_epoch is not None else _watermark(session)
+            seen_ids = _existing_ids(session)
             seen_pairs = _existing_pairs(session)
             newest_epoch = watermark
 
@@ -144,20 +179,23 @@ def run_ingest(max_messages: int = INGEST_MAX_MESSAGES) -> dict:
                     if not job.get("title") or not job.get("company"):
                         continue
                     summary["jobs_found"] += 1
-                    key = _job_key(payload.provider, job)
-                    pair = (norm(job.get("title")), norm(job.get("company")))
-                    # URL comes from the same tile the fields were parsed from,
-                    # so title/company/location and the link are always consistent.
                     url = (job.get("url") or "").strip()
-                    # Dedup against everything already in the DB: same job
-                    # (title|company) OR same link. Catches resent alerts and
-                    # rows from the old pipeline regardless of key format.
-                    if pair in seen_pairs or (url and url in seen_urls):
-                        summary["duplicates"] += 1
-                        continue
-                    seen_pairs.add(pair)
-                    if url:
-                        seen_urls.add(url)
+                    key = _job_key(payload.provider, job)
+                    cid = canonical_id(url)
+                    # Dedup by the posting id from the link (distinct postings of
+                    # the same role are kept). Fall back to title|company only
+                    # when the link carries no id.
+                    if cid:
+                        if cid in seen_ids:
+                            summary["duplicates"] += 1
+                            continue
+                        seen_ids.add(cid)
+                    else:
+                        pair = (norm(job.get("title")), norm(job.get("company")))
+                        if pair in seen_pairs:
+                            summary["duplicates"] += 1
+                            continue
+                        seen_pairs.add(pair)
 
                     row = Job(
                         job_key=key,
