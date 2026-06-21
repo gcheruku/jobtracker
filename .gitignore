@@ -21,10 +21,18 @@ uploads/
 # Secrets & personal documents — MUST NOT be committed
 backend/.env
 .env
-backend/secrets/
 *.docx
+# Ignore everything in secrets/ EXCEPT the *.example.json templates + README.
+backend/secrets/*
+!backend/secrets/*.example.json
+!backend/secrets/README.md
 token.json
 credentials.json
+# (the example templates are explicitly un-ignored above)
+!backend/secrets/credentials.example.json
+!backend/secrets/token.example.json
+# any *.db (jobs.db handled above) — never commit databases
+*.db
 
 # Local tooling
 .claude/

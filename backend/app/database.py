@@ -35,10 +35,23 @@ def _add_column_if_missing(conn, table: str, column: str, ddl_type: str) -> None
 
 
 def init_db() -> None:
-    """Idempotent: safe to call on every startup."""
+    """Idempotent: safe to call on every startup.
+
+    Bootstraps a fresh database (creates the SQLModel tables + the key/value
+    `meta` table) and additively migrates an existing one. create_all leaves any
+    table that already exists untouched, so an existing jobs.db is preserved.
+    """
+    # Bootstrap for a clean clone: meta isn't a SQLModel model, so create it here.
+    with engine.begin() as conn:
+        conn.execute(
+            text("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+        )
+    # Create jobs/note/checklist_item/resume/geo_cache if absent.
+    SQLModel.metadata.create_all(engine)
+
     with engine.begin() as conn:
         before = _existing_columns(conn, "jobs")
-        # Additive columns on the existing jobs table.
+        # Additive columns for older databases that predate them.
         _add_column_if_missing(conn, "jobs", "ignored", "INTEGER DEFAULT 0")
         _add_column_if_missing(conn, "jobs", "work_mode", "TEXT")
         _add_column_if_missing(conn, "jobs", "compare_score", "REAL")
@@ -70,9 +83,6 @@ def init_db() -> None:
         skipped = conn.execute(
             text("SELECT COUNT(*) FROM jobs WHERE ignored = 1")
         ).scalar()
-
-    # Create the brand-new tables; existing tables are left untouched.
-    SQLModel.metadata.create_all(engine)
 
     if added:
         logger.info("Migration: added columns to jobs: %s", ", ".join(sorted(added)))

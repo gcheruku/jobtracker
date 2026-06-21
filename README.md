@@ -1,92 +1,78 @@
 # JobTrack — Self-Hosted Job Tracking Dashboard
 
-Decoupled architecture: a **Python/FastAPI** backend over **SQLite** (SQLModel) and a
-**Vite + React + TypeScript + Tailwind** frontend. Builds directly on the existing
-`jobs.db` (your real ingested job data) — no data is dropped or recreated.
+A self-hosted job tracker with a **FastAPI + SQLite** backend and a
+**Vite + React + TypeScript + Tailwind** frontend. It ingests job-alert emails
+from Gmail, scores them against your resume, and gives you a Kanban board,
+filtering, preferences, and an AI resume-fit analysis.
 
-## File structure
+> No personal data is in this repo — your resume, Gmail credentials, `.env`, and
+> the SQLite database are all gitignored. Sample/template files are provided so
+> you can supply your own.
 
-```
-jobtracker/
-├── jobs.db                     # existing SQLite DB (1,571 real rows) — used as-is
-├── jobs.db.backup-*            # timestamped backup made before first run
-├── backend/
-│   ├── requirements.txt
-│   ├── .env.example
-│   └── app/
-│       ├── main.py             # FastAPI app + CORS + startup migration
-│       ├── config.py           # env-driven settings, pipeline + status maps
-│       ├── database.py         # engine + non-destructive ADD COLUMN / create_all
-│       ├── models.py           # Job (existing table) + Note/Resume/ChecklistItem
-│       ├── schemas.py          # request/response models
-│       ├── routers/
-│       │   ├── jobs.py         # CRUD, status move, ignore/restore, notes, checklist
-│       │   ├── resume.py       # paste text / upload PDF, activate, delete
-│       │   ├── ai.py           # POST /api/ai/compare/{job_key}
-│       │   └── stats.py        # metric cards + recent activity
-│       └── services/ai.py      # heuristic stub + optional Claude (claude-opus-4-8)
-└── frontend/
-    ├── package.json
-    ├── vite.config.ts          # dev proxy /api -> :8000
-    └── src/
-        ├── App.tsx             # layout, optimistic Kanban moves
-        ├── lib/{api,types,ui}.ts
-        └── components/         # Sidebar, TopBar, MetricCards, KanbanBoard,
-                                # JobDrawer, ComparePanel, ActivityLog, IgnoredView
-```
+## Features
+- **Kanban board** (Saved / Applied / Interviewing / Offer) with drag-and-drop.
+- **Gmail ingestion** of Dice/LinkedIn/Glassdoor/Indeed alerts — scheduled every
+  4h and via a manual **Fetch alerts** button; deduped by posting id.
+- **Offline semantic match** (sentence-transformers) of your resume vs each job.
+- **AI "Compare with Resume"** — detailed Gemini analysis (match score, skill
+  gaps, red flags, improvements).
+- **Preferences** (salary / location+distance / min score / keywords) that move
+  non-matching jobs to a **Mismatched** view; skipped/expired/rejected go to
+  **Inactive**.
+- **Global search**, job drawer with notes & checklists, expiry detection.
 
-## Data model notes
+## Setup
 
-- The existing `jobs` table is reused. The app only **adds** two nullable columns on
-  first run: `ignored` (boolean) and `work_mode`. `note`, `resume`, and
-  `checklist_item` are new tables created alongside.
-- **Pipeline columns:** Saved · Applied · Interviewing · Offer · Rejected. Legacy
-  statuses map for display (`Viewed→Saved`, `Declined/Expired→Rejected`); the original
-  value is preserved in the DB and returned as `raw_status`.
-- **Ignore:** a job can be ignored (hidden from the board, kept in the DB) and later
-  restored to its prior status or deleted — see the **Ignored** view.
+### Prerequisites
+- Python 3.11+ and Node 18+
+- (Optional) A Google **Gemini API key** for the AI compare, and Gmail OAuth
+  credentials for ingestion.
 
-## Run it
-
-### 1. Backend (port 8000)
+### 1. Backend
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+cp .env.example .env          # then edit (see below)
+uvicorn app.main:app --port 8000   # no --reload (in-process scheduler)
 ```
-Interactive API docs: http://localhost:8000/docs
+On first run the app **creates a fresh `jobs.db`** automatically. API docs at
+http://localhost:8000/docs.
 
-### 2. Frontend (port 5173)
+Edit `.env` (all optional — the app runs without them, with reduced features):
+- `GOOGLE_API_KEY` — enables Gemini "Compare with Resume".
+- `RESUME_DOCX_PATH` — path to your resume `.docx` (default `../Resume.docx`),
+  used for match scoring. Provide your own; it is **not** in the repo.
+- Gmail ingestion: put OAuth files in `backend/secrets/` — see
+  [`backend/secrets/README.md`](backend/secrets/README.md).
+- See [`backend/.env.example`](backend/.env.example) for the full list.
+
+### 2. Frontend
 ```bash
 cd frontend
 npm install
-npm run dev        # open http://localhost:5173
+npm run dev          # http://localhost:5173 (proxies /api -> :8000)
 ```
-`vite.config.ts` proxies `/api` → `http://localhost:8000`, so no CORS setup is needed
-in dev.
 
 ### Production / remote
 ```bash
 cd frontend && VITE_API_BASE=http://YOUR_SERVER:8000 npm run build
-# serve frontend/dist as static files (nginx, `python -m http.server`, or FastAPI StaticFiles)
+# serve frontend/dist statically (nginx, python -m http.server, or FastAPI StaticFiles)
 ```
-The backend enables open CORS by default so any device on your network can connect.
+CORS is open by default (`JOBTRACKER_CORS_ORIGINS` to restrict).
 
-## AI Resume Fit
+## Project layout
+```
+jobtracker/
+├── backend/          FastAPI app (app/), requirements.txt, .env.example, secrets/
+├── frontend/         Vite + React app (src/components, src/lib)
+├── prompts/          The prompts used to build this + the figma design
+└── README.md
+```
 
-`POST /api/ai/compare/{job_key}` compares the active resume against a job and returns a
-match score, matched/missing keyword chips, interview prep questions, and resume tips.
-
-- **Offline default:** a deterministic keyword-overlap heuristic (`source: heuristic-stub`).
-- **Real LLM:** set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`, default
-  `claude-opus-4-8`) to get Claude-generated analysis. Falls back to the heuristic on any
-  error, so the endpoint never hard-fails.
-
-Add a resume first via the API (`POST /api/resumes/text` or `/api/resumes/upload`).
-
-## Safety
-
-A timestamped copy of `jobs.db` is created before the first run. The startup migration
-is idempotent and only uses additive `ALTER TABLE ADD COLUMN` + `create_all` — it never
-drops or rewrites existing rows.
+## Notes
+- The startup migration is additive and idempotent (`ALTER TABLE ADD COLUMN` +
+  `create_all`) — it never drops or rewrites rows, so it safely upgrades an
+  existing `jobs.db` or bootstraps a new one.
+- Without a Gemini key, "Compare with Resume" falls back to an offline heuristic;
+  without Gmail credentials, ingestion is disabled but everything else works.
