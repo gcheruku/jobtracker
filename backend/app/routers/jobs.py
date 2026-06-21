@@ -100,12 +100,16 @@ def list_jobs(
         stmt = stmt.where(Job.work_mode == work_mode)
 
     if q:
-        like = f"%{q.lower()}%"
-        stmt = stmt.where(
-            func.lower(Job.title).like(like)
-            | func.lower(Job.company).like(like)
-            | func.lower(Job.location).like(like)
-        )
+        # Each word must appear in SOME column (title/company/location); words
+        # need not be contiguous or in the same column. e.g. "senior citi" ->
+        # "senior" in title AND "citi" in company.
+        for token in q.lower().split():
+            like = f"%{token}%"
+            stmt = stmt.where(
+                func.lower(Job.title).like(like)
+                | func.lower(Job.company).like(like)
+                | func.lower(Job.location).like(like)
+            )
 
     jobs = session.exec(stmt).all()
     out = [_to_out(j) for j in jobs]

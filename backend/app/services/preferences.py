@@ -54,17 +54,32 @@ def save_settings(session: Session, settings: Settings) -> None:
 # --- salary parsing -----------------------------------------------------------
 
 def parse_salary_annual(salary: Optional[str]) -> Optional[Tuple[int, int]]:
-    """Return (low, high) annualized salary, or None if unparseable."""
+    """Return (low, high) annualized salary, or None if unparseable.
+
+    Handles K/M magnitude suffixes ("$144K - $288K" -> 144000-288000) and
+    hourly/daily rates ("$100/hr", "$950 a day")."""
     if not salary:
         return None
-    nums = [float(n.replace(",", "")) for n in re.findall(r"[\d,]+(?:\.\d+)?", salary)]
-    nums = [n for n in nums if n > 0]
-    if not nums:
-        return None
     low = salary.lower()
-    factor = _HOURS_PER_YEAR if "hour" in low else _DAYS_PER_YEAR if "day" in low else 1
-    scaled = [int(n * factor) for n in nums]
-    return min(scaled), max(scaled)
+    period = _HOURS_PER_YEAR if "hour" in low or "/hr" in low else (
+        _DAYS_PER_YEAR if "day" in low else 1
+    )
+    values = []
+    for num, suffix in re.findall(r"([\d,]+(?:\.\d+)?)\s*([kKmM])?", salary):
+        try:
+            n = float(num.replace(",", ""))
+        except ValueError:
+            continue
+        if n <= 0:
+            continue
+        if suffix.lower() == "k":
+            n *= 1_000
+        elif suffix.lower() == "m":
+            n *= 1_000_000
+        values.append(int(n * period))
+    if not values:
+        return None
+    return min(values), max(values)
 
 
 # --- matching -----------------------------------------------------------------
