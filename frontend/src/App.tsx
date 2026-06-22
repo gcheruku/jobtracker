@@ -140,8 +140,13 @@ export default function App() {
             }}
           />
         ) : (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-            <MetricCards stats={stats.data} />
+          // No top padding here: the sticky column dropdown pins flush against
+          // the top bar (top padding would leave a strip where cards show
+          // through while scrolling). The top gap moves onto MetricCards.
+          <div className="flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">
+            <div className="pt-4 sm:pt-6">
+              <MetricCards stats={stats.data} />
+            </div>
 
             <div
               className={`mt-6 grid grid-cols-1 gap-6 ${

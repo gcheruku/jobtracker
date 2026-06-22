@@ -127,14 +127,22 @@ export function JobDetail({
         )}
       </div>
 
-      {/* Primary action */}
-      <div className="mx-auto w-full max-w-3xl px-5 pb-4">
+      {/* Primary actions */}
+      <div className="mx-auto flex w-full max-w-3xl gap-2 px-5 pb-4">
         <button
           onClick={() => setShowCompare(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
         >
           <Sparkles size={16} />
           Compare with Resume
+        </button>
+        <button
+          onClick={() => ignore.mutate()}
+          title="Skip this job (hide from board)"
+          className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+        >
+          <EyeOff size={16} />
+          Skip
         </button>
       </div>
 
@@ -315,16 +323,6 @@ export function JobDetail({
               </li>
             </ol>
           </Section>
-
-          {/* Ignore */}
-          <div className="px-5 py-5">
-            <button
-              onClick={() => ignore.mutate()}
-              className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-rose-600"
-            >
-              <EyeOff size={15} /> Skip this job (hide from board)
-            </button>
-          </div>
         </div>
       </div>
     </div>

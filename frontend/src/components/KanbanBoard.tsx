@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useDroppable,
   useDraggable,
   useSensor,
@@ -106,6 +107,7 @@ function Column({
   onIgnore,
   widthClass = "w-72 shrink-0",
   hideHeader = false,
+  scrollable = true,
 }: {
   status: PipelineStatus;
   jobs: Job[];
@@ -113,6 +115,9 @@ function Column({
   onIgnore: (j: Job) => void;
   widthClass?: string;
   hideHeader?: boolean;
+  // When false the column flows with the page scroll instead of capping its
+  // own height (used on mobile so the whole view scrolls as one).
+  scrollable?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const style = STATUS_STYLES[status];
@@ -129,7 +134,9 @@ function Column({
       )}
       <div
         ref={setNodeRef}
-        className={`thin-scroll flex max-h-[calc(100vh-19rem)] flex-1 flex-col gap-2 overflow-y-auto rounded-xl border-2 border-dashed p-2 transition ${
+        className={`flex flex-1 flex-col gap-2 rounded-xl border-2 border-dashed p-2 transition ${
+          scrollable ? "thin-scroll max-h-[calc(100vh-19rem)] overflow-y-auto" : ""
+        } ${
           isOver ? "border-indigo-300 bg-indigo-50/50" : "border-slate-200 bg-slate-100/40"
         }`}
       >
@@ -161,7 +168,13 @@ export function KanbanBoard({
   // Mobile shows one column at a time; default to "Saved".
   const [mobileStatus, setMobileStatus] = useState<PipelineStatus>("Saved");
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+    // Mouse: small movement starts a drag. Touch: require a short press-and-hold
+    // so vertical scrolling on mobile never gets mistaken for a drag (which used
+    // to flash the drag overlay at the top of the screen).
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 220, tolerance: 6 },
+    })
   );
 
   const byStatus = useMemo(() => {
@@ -188,25 +201,29 @@ export function KanbanBoard({
     <DndContext sensors={sensors} onDragStart={handleStart} onDragEnd={handleEnd}>
       {/* Mobile: one column at a time, chosen via dropdown */}
       <div className="md:hidden">
-        <div className="relative mb-3">
-          <span
-            className={`pointer-events-none absolute left-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ${dotStyle.dot}`}
-          />
-          <select
-            value={mobileStatus}
-            onChange={(e) => setMobileStatus(e.target.value as PipelineStatus)}
-            className="w-full cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-7 pr-8 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-400"
-          >
-            {BOARD_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s} ({byStatus[s].length})
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            size={16}
-            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-          />
+        {/* Sticks to the top of the scroll area once the cards above scroll
+            away, leaving the column dropdown as the topmost element. */}
+        <div className="sticky top-0 z-10 -mx-4 mb-3 bg-slate-100 px-4 pb-2 pt-1 sm:-mx-6 sm:px-6">
+          <div className="relative">
+            <span
+              className={`pointer-events-none absolute left-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ${dotStyle.dot}`}
+            />
+            <select
+              value={mobileStatus}
+              onChange={(e) => setMobileStatus(e.target.value as PipelineStatus)}
+              className="w-full cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-7 pr-8 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-400"
+            >
+              {BOARD_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s} ({byStatus[s].length})
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={16}
+              className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+          </div>
         </div>
         <Column
           status={mobileStatus}
@@ -215,6 +232,7 @@ export function KanbanBoard({
           onIgnore={onIgnore}
           widthClass="w-full"
           hideHeader
+          scrollable={false}
         />
       </div>
 
