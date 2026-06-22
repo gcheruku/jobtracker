@@ -1,0 +1,24 @@
+# Self-hosted GitHub Actions runner for Synology Container Manager.
+#
+# Create this as a PROJECT in Container Manager (Project -> Create -> paste this
+# as the docker-compose.yml). Replace PASTE_YOUR_REGISTRATION_TOKEN with the
+# token from GitHub -> repo Settings -> Actions -> Runners -> New self-hosted
+# runner (it expires in ~1 hour, so register promptly).
+#
+# The docker.sock mount lets the runner build and run the app containers on the
+# NAS itself. The runner only makes OUTBOUND calls to GitHub.
+
+services:
+  runner:
+    image: myoung34/github-runner:latest
+    container_name: gh-runner
+    restart: unless-stopped
+    environment:
+      REPO_URL: https://github.com/gcheruku/jobtracker
+      RUNNER_TOKEN: PASTE_YOUR_REGISTRATION_TOKEN
+      RUNNER_NAME: synology-ds220
+      RUNNER_SCOPE: repo
+      LABELS: self-hosted
+      DISABLE_AUTO_UPDATE: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
