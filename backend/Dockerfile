@@ -1,11 +1,22 @@
-# JobTrack backend — FastAPI + SQLite (+ sentence-transformers).
+# JobTrack backend — FastAPI + SQLite.
+#
+# By default this builds the SLIM image (no PyTorch). Offline semantic matching
+# (sentence-transformers) is opt-in via the build arg so it isn't forced onto
+# low-RAM hosts like a 2 GB Synology DS220+:
+#   docker build --build-arg WITH_SEMANTIC=true ...
+# The Gemini "Compare with Resume" feature works either way.
 FROM python:3.12-slim
+
+ARG WITH_SEMANTIC=false
 
 WORKDIR /app
 
 # Install Python deps first for better layer caching.
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-semantic.txt ./
+RUN pip install --no-cache-dir -r requirements.txt && \
+    if [ "$WITH_SEMANTIC" = "true" ]; then \
+        pip install --no-cache-dir -r requirements-semantic.txt; \
+    fi
 
 # App code only — personal data (db, secrets, resume, .env) is mounted at /data.
 COPY app ./app

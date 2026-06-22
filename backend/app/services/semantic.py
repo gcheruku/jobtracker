@@ -37,6 +37,11 @@ def is_available() -> bool:
 
 def _get_model():
     global _model
+    # Slim / Torch-free builds omit sentence-transformers. Degrade to "no scoring"
+    # instead of raising so ingestion (JD fetch + expiry detection) and the rest of
+    # the app keep working.
+    if not is_available():
+        return None
     if _model is None:
         from sentence_transformers import SentenceTransformer
 
@@ -49,10 +54,13 @@ def _resume_embedding():
     """Cached embedding of the resume text."""
     global _resume_emb
     if _resume_emb is None:
+        model = _get_model()
+        if model is None:
+            return None
         text = resume_text()
         if not text:
             return None
-        _resume_emb = _get_model().encode(text, convert_to_tensor=True)
+        _resume_emb = model.encode(text, convert_to_tensor=True)
     return _resume_emb
 
 

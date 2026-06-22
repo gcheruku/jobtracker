@@ -20,6 +20,9 @@ jobs:
       # Actions -> Variables) if your path differs.
       DATA_DIR: ${{ vars.DATA_DIR || '/volume1/docker/jobtracker/data' }}
       WEB_PORT: ${{ vars.WEB_PORT || '8080' }}
+      # SLIM backend (no PyTorch) by default for low-RAM NAS hardware. To enable
+      # offline semantic matching, set a repo variable WITH_SEMANTIC=true.
+      WITH_SEMANTIC: ${{ vars.WITH_SEMANTIC || 'false' }}
     steps:
       - uses: actions/checkout@v4
 

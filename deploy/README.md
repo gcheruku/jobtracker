@@ -71,7 +71,14 @@ EOF
 
 Push to `main` (or run the **Deploy to Synology** workflow manually via
 Actions → Run workflow). The runner builds the images on the NAS and starts the
-stack. First build is slow (it pulls Torch for sentence-transformers).
+stack.
+
+By default this builds the **slim backend** (no PyTorch) — fast to build and runs
+in well under 1 GB RAM, ideal for a 2 GB DS220+. The Gemini "Compare with Resume"
+feature works in slim mode; only the *offline* semantic resume↔JD matching is
+omitted. To enable it on a higher-RAM host, set a repo **Variable**
+`WITH_SEMANTIC=true` (Settings → Secrets and variables → Actions → Variables) and
+re-deploy.
 
 ## Step 4 — Use it
 
@@ -83,8 +90,9 @@ files in `secrets/`); the resume comes from `/data/Resume.docx`.
 ## Notes
 - **Security:** mounting `docker.sock` gives the runner root-equivalent access to
   the NAS — fine for a private repo you control. Keep the repo private.
-- **Resources:** the backend image is large (Torch). Ensure the NAS is x86_64 (or
-  arm64) with enough RAM (~2 GB free) and disk for the image + `hf-cache`.
+- **Resources:** the default slim backend has no Torch and is small. Only the
+  `WITH_SEMANTIC=true` build is large (Torch + `hf-cache`) and wants ~2 GB free
+  RAM; don't enable it on a 2 GB DS220+.
 - **Backend `/docs`:** to reach the API docs directly, add `ports: ["8000:8000"]`
   to the backend service (otherwise it's internal-only).
 - **Rollback:** images are tagged `:latest`; to roll back, deploy an earlier

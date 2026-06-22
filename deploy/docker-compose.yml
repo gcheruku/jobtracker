@@ -7,6 +7,10 @@ services:
   backend:
     build:
       context: ../backend
+      args:
+        # SLIM by default (no PyTorch) — friendly to low-RAM NAS hardware.
+        # Set WITH_SEMANTIC=true to also install sentence-transformers/Torch.
+        WITH_SEMANTIC: ${WITH_SEMANTIC:-false}
     image: jobtracker-backend:latest
     container_name: jobtracker-backend
     restart: unless-stopped

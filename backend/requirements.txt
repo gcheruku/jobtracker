@@ -17,8 +17,10 @@ requests>=2.31
 pgeocode>=0.4
 APScheduler>=3.10
 
-# Offline semantic resume<->JD matching
-sentence-transformers>=3.0
+# NOTE: offline semantic resume<->JD matching (sentence-transformers / Torch) is
+# kept in requirements-semantic.txt so the base image stays small. Install it for
+# the full build (Dockerfile arg WITH_SEMANTIC=true); the app degrades gracefully
+# to "no semantic scoring" when it's absent.
 
 # Optional: only needed if you set ANTHROPIC_API_KEY for real LLM analysis.
 anthropic>=0.40
