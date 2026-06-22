@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { ChevronDown, ExternalLink, EyeOff, MapPin } from "lucide-react";
+import { Check, ChevronDown, ExternalLink, EyeOff, MapPin } from "lucide-react";
 import { BOARD_STATUSES, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
@@ -21,11 +21,17 @@ function JobCard({
   job,
   onOpen,
   onIgnore,
+  onSelect,
+  selected = false,
+  selectionMode = false,
   dragging,
 }: {
   job: Job;
   onOpen: (j: Job) => void;
   onIgnore: (j: Job) => void;
+  onSelect?: (j: Job, shiftKey: boolean) => void;
+  selected?: boolean;
+  selectionMode?: boolean;
   dragging?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -37,15 +43,42 @@ function JobCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      onClick={() => onOpen(job)}
-      className={`group cursor-pointer rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:shadow-md ${
-        isDragging && !dragging ? "opacity-30" : ""
-      }`}
+      onClick={(e) =>
+        selectionMode || e.shiftKey ? onSelect?.(job, e.shiftKey) : onOpen(job)
+      }
+      className={`group cursor-pointer select-none rounded-lg border bg-white p-3 shadow-sm transition hover:shadow-md ${
+        selected
+          ? "border-indigo-400 bg-indigo-50/50 ring-1 ring-indigo-300"
+          : "border-slate-200"
+      } ${isDragging && !dragging ? "opacity-30" : ""}`}
     >
       <div className="flex items-start gap-2">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">
-          {initials(job.company)}
-        </div>
+        {/* Avatar doubles as a select toggle (Gmail-style): tap it to select. */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect?.(job, e.shiftKey);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          title={selected ? "Deselect" : "Select"}
+          className={`group/av relative grid h-8 w-8 shrink-0 place-items-center rounded-md text-xs font-bold transition ${
+            selected
+              ? "bg-indigo-600 text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-indigo-100"
+          }`}
+        >
+          {selected ? (
+            <Check size={16} />
+          ) : (
+            <>
+              <span className="transition group-hover/av:opacity-0">{initials(job.company)}</span>
+              <Check
+                size={16}
+                className="absolute text-indigo-500 opacity-0 transition group-hover/av:opacity-100"
+              />
+            </>
+          )}
+        </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold leading-tight">
             {job.title || "Untitled role"}
@@ -105,6 +138,10 @@ function Column({
   jobs,
   onOpen,
   onIgnore,
+  onToggleSelect,
+  onRangeSelect,
+  anchorKey,
+  selectedKeys,
   widthClass = "w-72 shrink-0",
   hideHeader = false,
   scrollable = true,
@@ -113,6 +150,10 @@ function Column({
   jobs: Job[];
   onOpen: (j: Job) => void;
   onIgnore: (j: Job) => void;
+  onToggleSelect: (j: Job) => void;
+  onRangeSelect: (keys: string[]) => void;
+  anchorKey: string | null;
+  selectedKeys: Set<string>;
   widthClass?: string;
   hideHeader?: boolean;
   // When false the column flows with the page scroll instead of capping its
@@ -121,6 +162,23 @@ function Column({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const style = STATUS_STYLES[status];
+
+  // Shift+click selects the contiguous range from the anchor to this card,
+  // within this column's order. Falls back to a single toggle when there's no
+  // anchor or the anchor lives in another column.
+  const handleSelect = (job: Job, shiftKey: boolean) => {
+    if (shiftKey && anchorKey) {
+      const ids = jobs.map((j) => j.job_key);
+      const ai = ids.indexOf(anchorKey);
+      const ti = ids.indexOf(job.job_key);
+      if (ai !== -1 && ti !== -1) {
+        const [lo, hi] = ai < ti ? [ai, ti] : [ti, ai];
+        onRangeSelect(ids.slice(lo, hi + 1));
+        return;
+      }
+    }
+    onToggleSelect(job);
+  };
   return (
     <div className={`flex flex-col ${widthClass}`}>
       {!hideHeader && (
@@ -146,7 +204,15 @@ function Column({
           </div>
         )}
         {jobs.map((job) => (
-          <JobCard key={job.job_key} job={job} onOpen={onOpen} onIgnore={onIgnore} />
+          <JobCard
+            key={job.job_key}
+            job={job}
+            onOpen={onOpen}
+            onIgnore={onIgnore}
+            onSelect={handleSelect}
+            selected={selectedKeys.has(job.job_key)}
+            selectionMode={selectedKeys.size > 0}
+          />
         ))}
       </div>
     </div>
@@ -158,11 +224,19 @@ export function KanbanBoard({
   onOpen,
   onIgnore,
   onMove,
+  onToggleSelect,
+  onRangeSelect,
+  anchorKey,
+  selectedKeys,
 }: {
   jobs: Job[];
   onOpen: (j: Job) => void;
   onIgnore: (j: Job) => void;
   onMove: (jobKey: string, status: PipelineStatus) => void;
+  onToggleSelect: (j: Job) => void;
+  onRangeSelect: (keys: string[]) => void;
+  anchorKey: string | null;
+  selectedKeys: Set<string>;
 }) {
   const [active, setActive] = useState<Job | null>(null);
   // Mobile shows one column at a time; default to "Saved".
@@ -230,6 +304,10 @@ export function KanbanBoard({
           jobs={byStatus[mobileStatus]}
           onOpen={onOpen}
           onIgnore={onIgnore}
+          onToggleSelect={onToggleSelect}
+          onRangeSelect={onRangeSelect}
+          anchorKey={anchorKey}
+          selectedKeys={selectedKeys}
           widthClass="w-full"
           hideHeader
           scrollable={false}
@@ -245,6 +323,10 @@ export function KanbanBoard({
             jobs={byStatus[status]}
             onOpen={onOpen}
             onIgnore={onIgnore}
+            onToggleSelect={onToggleSelect}
+            onRangeSelect={onRangeSelect}
+            anchorKey={anchorKey}
+            selectedKeys={selectedKeys}
           />
         ))}
       </div>
