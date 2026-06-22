@@ -72,6 +72,9 @@ export const api = {
   restoreJob(k: string): Promise<Job> {
     return http<Job>(`/api/jobs/${key(k)}/restore`, { method: "POST" });
   },
+  refreshDescription(k: string): Promise<Job> {
+    return http<Job>(`/api/jobs/${key(k)}/refresh-description`, { method: "POST" });
+  },
   deleteJob(k: string): Promise<void> {
     return http<void>(`/api/jobs/${key(k)}`, { method: "DELETE" });
   },

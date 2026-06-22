@@ -18,6 +18,7 @@ from ..config import (
 )
 from ..database import get_session
 from ..models import ChecklistItem, Job, Note
+from ..services.jd_fetch import fetch_job_description
 from ..schemas import (
     BulkKeys,
     ChecklistItemIn,
@@ -235,6 +236,23 @@ def ignore_job(job_key: str, session: Session = Depends(get_session)):
     session.add(job)
     session.commit()
     session.refresh(job)
+    return _to_out(job)
+
+
+@router.post("/{job_key}/refresh-description", response_model=JobOut)
+def refresh_description(job_key: str, session: Session = Depends(get_session)):
+    """Re-fetch the job description from the posting (stored as Markdown)."""
+    job = session.get(Job, job_key)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not job.url:
+        raise HTTPException(400, "Job has no URL to fetch a description from")
+    desc = fetch_job_description(job.url)
+    if desc:
+        job.job_description = desc
+        session.add(job)
+        session.commit()
+        session.refresh(job)
     return _to_out(job)
 
 

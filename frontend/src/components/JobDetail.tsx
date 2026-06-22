@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   X,
   ExternalLink,
@@ -10,6 +12,8 @@ import {
   Plus,
   Trash2,
   EyeOff,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { PIPELINE, type Job, type PipelineStatus } from "../lib/types";
@@ -92,6 +96,10 @@ export function JobDetail({
   });
   const move = useMutation({
     mutationFn: (status: PipelineStatus) => api.moveStatus(job.job_key, status),
+    onSuccess: onChanged,
+  });
+  const refreshDesc = useMutation({
+    mutationFn: () => api.refreshDescription(job.job_key),
     onSuccess: onChanged,
   });
   const ignore = useMutation({
@@ -206,13 +214,42 @@ export function JobDetail({
             </dl>
           </Section>
 
-          {/* Description */}
-          {job.job_description && (
-            <Section title="Job description">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
-                {job.job_description.slice(0, 4000)}
-              </p>
-            </Section>
+          {/* Description (rich Markdown, not truncated) */}
+          {(job.job_description || job.url) && (
+            <section className="border-t border-slate-100 px-5 py-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Job description
+                </h4>
+                {job.url && (
+                  <button
+                    onClick={() => refreshDesc.mutate()}
+                    disabled={refreshDesc.isPending}
+                    title="Re-fetch the description from the posting"
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {refreshDesc.isPending ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={13} />
+                    )}
+                    {job.job_description ? "Refresh" : "Load"}
+                  </button>
+                )}
+              </div>
+              {job.job_description ? (
+                <article className="prose prose-sm max-w-none text-slate-600 prose-headings:font-semibold prose-headings:text-slate-800 prose-h1:text-base prose-h2:text-base prose-h3:text-sm prose-strong:text-slate-800 prose-a:text-indigo-600 prose-li:my-0.5 prose-p:leading-relaxed">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {job.job_description}
+                  </ReactMarkdown>
+                </article>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  No description loaded yet
+                  {refreshDesc.isError ? " — couldn't fetch it from the posting." : "."}
+                </p>
+              )}
+            </section>
           )}
 
           {/* Notes */}

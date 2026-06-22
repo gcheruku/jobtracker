@@ -11,7 +11,7 @@ import json
 import re
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 from ..logging_config import logger
 
@@ -31,6 +31,82 @@ _SELECTORS = [
 ]
 _MIN_CHARS = 200
 
+# Inline tags whose children should flow together without surrounding newlines.
+_INLINE = {"strong", "b", "em", "i", "u", "span", "a", "code", "small"}
+
+
+def _md_inline(node) -> str:
+    """Convert an inline node (or string) to Markdown, preserving emphasis/links."""
+    if isinstance(node, NavigableString):
+        return re.sub(r"[ \t\r\n]+", " ", str(node))
+    if not isinstance(node, Tag):
+        return ""
+    name = (node.name or "").lower()
+    inner = "".join(_md_inline(c) for c in node.children)
+    if name in ("strong", "b"):
+        return f"**{inner.strip()}**" if inner.strip() else ""
+    if name in ("em", "i"):
+        return f"*{inner.strip()}*" if inner.strip() else ""
+    if name == "a":
+        href = (node.get("href") or "").strip()
+        text = inner.strip()
+        return f"[{text}]({href})" if href and text else text
+    if name == "br":
+        return "  \n"
+    return inner
+
+
+def _md_block(node, lines: list[str]) -> None:
+    """Walk block-level nodes, appending Markdown blocks/list items to `lines`."""
+    if isinstance(node, NavigableString):
+        text = re.sub(r"[ \t\r\n]+", " ", str(node)).strip()
+        if text:
+            lines.append(text)
+        return
+    if not isinstance(node, Tag):
+        return
+    name = (node.name or "").lower()
+    if name in ("script", "style"):
+        return
+    if name in ("ul", "ol"):
+        for i, li in enumerate(node.find_all("li", recursive=False), 1):
+            bullet = f"{i}." if name == "ol" else "-"
+            lines.append(f"{bullet} {_md_inline(li).strip()}")
+        lines.append("")
+        return
+    if re.fullmatch(r"h[1-6]", name):
+        level = min(int(name[1]), 4)
+        lines.append(f"{'#' * level} {_md_inline(node).strip()}")
+        lines.append("")
+        return
+    if name in ("p", "div", "section", "article", "li"):
+        # Block container: if it holds block children, recurse; else emit inline.
+        if any(isinstance(c, Tag) and (c.name or "").lower() not in _INLINE | {"br"} for c in node.children):
+            for c in node.children:
+                _md_block(c, lines)
+        else:
+            text = _md_inline(node).strip()
+            if text:
+                lines.append(text)
+                lines.append("")
+        return
+    # Inline or unknown wrapper: flatten to inline text.
+    text = _md_inline(node).strip()
+    if text:
+        lines.append(text)
+
+
+def _to_markdown(html: str) -> str:
+    """Best-effort HTML -> Markdown that keeps headings, lists, emphasis, links."""
+    soup = BeautifulSoup(html or "", "lxml")
+    root = soup.body or soup
+    lines: list[str] = []
+    for child in root.children:
+        _md_block(child, lines)
+    md = "\n".join(lines)
+    md = re.sub(r"\n{3,}", "\n\n", md).strip()
+    return md
+
 
 def _extract(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
@@ -42,18 +118,16 @@ def _extract(html: str) -> str:
             continue
         for obj in data if isinstance(data, list) else [data]:
             if isinstance(obj, dict) and "JobPosting" in str(obj.get("@type", "")):
-                desc = BeautifulSoup(obj.get("description", "") or "", "lxml").get_text(
-                    " ", strip=True
-                )
-                if len(desc) >= _MIN_CHARS:
-                    return desc
+                md = _to_markdown(obj.get("description", "") or "")
+                if len(md) >= _MIN_CHARS:
+                    return md
     # 2) Known content containers.
     for sel in _SELECTORS:
         el = soup.select_one(sel)
         if el:
-            text = el.get_text(" ", strip=True)
-            if len(text) >= _MIN_CHARS:
-                return text
+            md = _to_markdown(str(el))
+            if len(md) >= _MIN_CHARS:
+                return md
     return ""
 
 
