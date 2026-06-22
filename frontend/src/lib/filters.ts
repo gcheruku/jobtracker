@@ -1,17 +1,22 @@
 import type { BoardFilters, Job } from "./types";
 
 /**
- * Best-effort parse of a salary string's lower bound into a yearly number.
- * Handles "$150,000", "150k", "$150K - $180K". Returns null when no number is
+ * Best-effort parse of a salary string into its low/high bounds.
+ * Handles "$150,000", "150k", "$50K - $180K". Returns null when no number is
  * found (those jobs are excluded while a salary filter is active).
  */
-export function salaryFloor(salary: string | null): number | null {
+export function salaryRange(salary: string | null): { lo: number; hi: number } | null {
   if (!salary) return null;
-  const m = salary.replace(/,/g, "").match(/\$?\s*(\d+(?:\.\d+)?)\s*([kK])?/);
-  if (!m) return null;
-  let n = parseFloat(m[1]);
-  if (m[2]) n *= 1000;
-  return Math.round(n);
+  const re = /(\d+(?:\.\d+)?)\s*([kK])?/g;
+  const nums: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(salary.replace(/,/g, ""))) !== null) {
+    let n = parseFloat(m[1]);
+    if (m[2]) n *= 1000;
+    nums.push(Math.round(n));
+  }
+  if (nums.length === 0) return null;
+  return { lo: Math.min(...nums), hi: Math.max(...nums) };
 }
 
 export function matchPct(job: Job): number | null {
@@ -36,10 +41,12 @@ export function applyBoardFilters(jobs: Job[], f: BoardFilters): Job[] {
       if (f.workMode.op === "isNot" && wm === f.workMode.value) return false;
     }
     if (f.salary) {
-      const s = salaryFloor(j.salary);
-      if (s == null) return false;
-      if (f.salary.op === "gte" && s < f.salary.value) return false;
-      if (f.salary.op === "lte" && s > f.salary.value) return false;
+      const r = salaryRange(j.salary);
+      if (r == null) return false;
+      // "at least X": the lower bound must clear X.
+      // "at most X": the upper bound must stay within X.
+      if (f.salary.op === "gte" && r.lo < f.salary.value) return false;
+      if (f.salary.op === "lte" && r.hi > f.salary.value) return false;
     }
     if (f.match) {
       const m = matchPct(j);
