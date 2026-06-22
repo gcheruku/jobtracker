@@ -62,7 +62,7 @@ function JobCard({
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               title="Open job posting"
-              className="opacity-0 transition group-hover:opacity-100"
+              className="opacity-100 transition md:opacity-0 md:group-hover:opacity-100"
             >
               <ExternalLink size={15} className="text-slate-400 hover:text-indigo-600" />
             </a>
@@ -72,8 +72,9 @@ function JobCard({
               e.stopPropagation();
               onIgnore(job);
             }}
+            onPointerDown={(e) => e.stopPropagation()}
             title="Skip this job"
-            className="opacity-0 transition group-hover:opacity-100"
+            className="opacity-100 transition md:opacity-0 md:group-hover:opacity-100"
           >
             <EyeOff size={15} className="text-slate-400 hover:text-rose-500" />
           </button>
