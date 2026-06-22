@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
-import { Activity } from "lucide-react";
+import { Activity, X } from "lucide-react";
 import { Sidebar, type View } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { MetricCards } from "./components/MetricCards";
@@ -185,12 +185,35 @@ export default function App() {
                 )}
               </div>
 
+              {/* Desktop (xl): activity sits in the right column. */}
               {activityOpen && (
-                <div className="space-y-6">
+                <div className="hidden space-y-6 xl:block">
                   <ActivityLog onCollapse={() => setActivityOpen(false)} />
                 </div>
               )}
             </div>
+
+            {/* Below xl: activity opens as a full-screen popup. */}
+            {activityOpen && (
+              <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 xl:hidden">
+                <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Activity size={18} className="text-indigo-600" />
+                    <h2 className="text-base font-semibold">Recent activity</h2>
+                  </div>
+                  <button
+                    onClick={() => setActivityOpen(false)}
+                    title="Close"
+                    className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  <ActivityLog hideHeader />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
