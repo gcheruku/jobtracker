@@ -6,6 +6,7 @@ import {
   FileText,
   Settings,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 
 export type View = "dashboard" | "mismatched" | "inactive" | "settings";
@@ -21,19 +22,44 @@ export function Sidebar({
   view,
   setView,
   counts,
+  open = false,
+  onClose,
 }: {
   view: View;
   setView: (v: View) => void;
   counts: Partial<Record<View, number>>;
+  open?: boolean;
+  onClose?: () => void;
 }) {
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div className="flex items-center gap-2 px-5 py-5">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
-          <Briefcase size={18} />
+    <>
+      {/* Backdrop on mobile when the drawer is open */}
+      <div
+        onClick={onClose}
+        className={`fixed inset-0 z-30 bg-slate-900/40 transition-opacity md:hidden ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-60 shrink-0 transform flex-col border-r border-slate-200 bg-white transition-transform md:static md:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between px-5 py-5">
+          <div className="flex items-center gap-2">
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
+              <Briefcase size={18} />
+            </div>
+            <span className="text-lg font-semibold tracking-tight">JobTrack</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 md:hidden"
+          >
+            <X size={20} />
+          </button>
         </div>
-        <span className="text-lg font-semibold tracking-tight">JobTrack</span>
-      </div>
 
       <nav className="flex-1 px-3">
         {NAV.map(({ id, label, icon: Icon }) => {
@@ -79,15 +105,16 @@ export function Sidebar({
         </div>
       </nav>
 
-      <div className="m-3 flex items-center gap-3 rounded-xl border border-slate-200 p-3">
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-800 text-sm font-semibold text-white">
-          JT
+        <div className="m-3 flex items-center gap-3 rounded-xl border border-slate-200 p-3">
+          <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-800 text-sm font-semibold text-white">
+            JT
+          </div>
+          <div className="leading-tight">
+            <div className="text-sm font-medium">Job Seeker</div>
+            <div className="text-xs text-slate-400">Self-hosted</div>
+          </div>
         </div>
-        <div className="leading-tight">
-          <div className="text-sm font-medium">Job Seeker</div>
-          <div className="text-xs text-slate-400">Self-hosted</div>
-        </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

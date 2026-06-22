@@ -37,10 +37,14 @@ export function JobDetail({
   job,
   onChanged,
   onClose,
+  showClose = true,
 }: {
   job: Job;
   onChanged: () => void;
   onClose?: () => void;
+  // Render the header close (✕) button. The focus view hides it and uses its
+  // own back control, but onClose is still used by the "skip job" action.
+  showClose?: boolean;
 }) {
   const qc = useQueryClient();
   const [showCompare, setShowCompare] = useState(false);
@@ -116,7 +120,7 @@ export function JobDetail({
           </h2>
           <p className="text-sm text-slate-500">{job.company}</p>
         </div>
-        {onClose && (
+        {onClose && showClose && (
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
             <X size={20} />
           </button>

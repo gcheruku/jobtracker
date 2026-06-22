@@ -4,20 +4,22 @@ import type { Stats } from "../lib/types";
 
 export function MetricCards({ stats }: { stats?: Stats }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-4 gap-2 sm:gap-3">
       {BOARD_STATUSES.map((s) => {
         const style = STATUS_STYLES[s];
         const count = stats?.by_status[s] ?? 0;
         return (
           <div
             key={s}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-500">{s}</span>
-              <span className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />
+            <div className="flex items-center gap-1.5">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${style.dot}`} />
+              <span className="truncate text-[11px] font-medium text-slate-500 sm:text-xs">
+                {s}
+              </span>
             </div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight">
+            <div className="mt-0.5 text-lg font-semibold tracking-tight sm:text-2xl">
               {count}
             </div>
           </div>

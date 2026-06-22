@@ -51,7 +51,7 @@ function ListItem({
  * Full-screen detail view: the jobs in the chosen column are listed down the
  * left, the selected job's details fill the right. The status dropdown switches
  * which column is browsed without leaving the view; a back arrow returns to the
- * board.
+ * board. On mobile the list collapses into an off-canvas drawer.
  */
 export function FocusView({
   jobs,
@@ -90,9 +90,9 @@ export function FocusView({
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      {/* Left: jobs in the chosen column */}
-      <aside className="flex w-80 shrink-0 flex-col border-r border-slate-200 bg-slate-50">
+    <div className="relative flex flex-1 overflow-hidden">
+      {/* Left: jobs in the chosen column (desktop only; mobile is detail-only) */}
+      <aside className="hidden w-80 shrink-0 flex-col border-r border-slate-200 bg-slate-50 md:flex">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4">
           <button
             onClick={onBack}
@@ -139,8 +139,25 @@ export function FocusView({
       </aside>
 
       {/* Right: selected job detail */}
-      <div className="min-w-0 flex-1">
-        <JobDetail key={selected.job_key} job={selected} onChanged={onChanged} onClose={onBack} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile-only bar: back to board (the view is purely the job detail) */}
+        <div className="flex items-center border-b border-slate-200 bg-white px-4 py-2.5 md:hidden">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-slate-900"
+          >
+            <ArrowLeft size={18} /> Back
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          <JobDetail
+            key={selected.job_key}
+            job={selected}
+            onChanged={onChanged}
+            onClose={onBack}
+            showClose={false}
+          />
+        </div>
       </div>
     </div>
   );

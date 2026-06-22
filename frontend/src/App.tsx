@@ -25,10 +25,13 @@ export default function App() {
   // The board card the user drilled into (full-screen focus view).
   const [focused, setFocused] = useState<Job | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  // Off-canvas sidebar on mobile.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Switching views always leaves the focus view.
+  // Switching views always leaves the focus view and closes the mobile nav.
   const setView = (v: View) => {
     setFocused(null);
+    setSidebarOpen(false);
     setViewState(v);
   };
 
@@ -80,6 +83,8 @@ export default function App() {
       <Sidebar
         view={view}
         setView={setView}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         counts={{
           dashboard: boardTotal,
           mismatched: mismatchedCount,
@@ -87,20 +92,25 @@ export default function App() {
         }}
       />
 
-      <main className="flex flex-1 flex-col overflow-hidden">
-        <TopBar
-          title={
-            view === "dashboard"
-              ? "Dashboard"
-              : view === "mismatched"
-                ? "Mismatched jobs"
-                : view === "inactive"
-                  ? "Inactive jobs"
-                  : "Settings"
-          }
-          filters={filters}
-          setFilters={setFilters}
-        />
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* On mobile the focus view is purely the job detail, so hide the top
+            bar (search, filters, Fetch alerts) there. */}
+        <div className={focused ? "hidden md:block" : ""}>
+          <TopBar
+            onMenu={() => setSidebarOpen(true)}
+            title={
+              view === "dashboard"
+                ? "Dashboard"
+                : view === "mismatched"
+                  ? "Mismatched jobs"
+                  : view === "inactive"
+                    ? "Inactive jobs"
+                    : "Settings"
+            }
+            filters={filters}
+            setFilters={setFilters}
+          />
+        </div>
 
         {view === "settings" ? (
           <div className="flex-1 overflow-y-auto">
@@ -130,7 +140,7 @@ export default function App() {
             }}
           />
         ) : (
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             <MetricCards stats={stats.data} />
 
             <div

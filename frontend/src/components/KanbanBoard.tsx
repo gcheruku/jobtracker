@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { ExternalLink, EyeOff, MapPin } from "lucide-react";
+import { ChevronDown, ExternalLink, EyeOff, MapPin } from "lucide-react";
 import { BOARD_STATUSES, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
@@ -103,23 +103,29 @@ function Column({
   jobs,
   onOpen,
   onIgnore,
+  widthClass = "w-72 shrink-0",
+  hideHeader = false,
 }: {
   status: PipelineStatus;
   jobs: Job[];
   onOpen: (j: Job) => void;
   onIgnore: (j: Job) => void;
+  widthClass?: string;
+  hideHeader?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const style = STATUS_STYLES[status];
   return (
-    <div className="flex w-72 shrink-0 flex-col">
-      <div className="mb-2 flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />
-          <span className="text-sm font-semibold">{status}</span>
-          <span className="text-xs text-slate-400">{jobs.length}</span>
+    <div className={`flex flex-col ${widthClass}`}>
+      {!hideHeader && (
+        <div className="mb-2 flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />
+            <span className="text-sm font-semibold">{status}</span>
+            <span className="text-xs text-slate-400">{jobs.length}</span>
+          </div>
         </div>
-      </div>
+      )}
       <div
         ref={setNodeRef}
         className={`thin-scroll flex max-h-[calc(100vh-19rem)] flex-1 flex-col gap-2 overflow-y-auto rounded-xl border-2 border-dashed p-2 transition ${
@@ -151,6 +157,8 @@ export function KanbanBoard({
   onMove: (jobKey: string, status: PipelineStatus) => void;
 }) {
   const [active, setActive] = useState<Job | null>(null);
+  // Mobile shows one column at a time; default to "Saved".
+  const [mobileStatus, setMobileStatus] = useState<PipelineStatus>("Saved");
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
@@ -173,9 +181,44 @@ export function KanbanBoard({
     if (over && job && job.status !== over) onMove(job.job_key, over);
   }
 
+  const dotStyle = STATUS_STYLES[mobileStatus];
+
   return (
     <DndContext sensors={sensors} onDragStart={handleStart} onDragEnd={handleEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      {/* Mobile: one column at a time, chosen via dropdown */}
+      <div className="md:hidden">
+        <div className="relative mb-3">
+          <span
+            className={`pointer-events-none absolute left-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ${dotStyle.dot}`}
+          />
+          <select
+            value={mobileStatus}
+            onChange={(e) => setMobileStatus(e.target.value as PipelineStatus)}
+            className="w-full cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-7 pr-8 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-400"
+          >
+            {BOARD_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s} ({byStatus[s].length})
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={16}
+            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+        </div>
+        <Column
+          status={mobileStatus}
+          jobs={byStatus[mobileStatus]}
+          onOpen={onOpen}
+          onIgnore={onIgnore}
+          widthClass="w-full"
+          hideHeader
+        />
+      </div>
+
+      {/* Desktop: all columns side by side */}
+      <div className="hidden gap-4 overflow-x-auto pb-2 md:flex">
         {BOARD_STATUSES.map((status) => (
           <Column
             key={status}
