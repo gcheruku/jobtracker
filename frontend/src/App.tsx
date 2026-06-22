@@ -6,6 +6,7 @@ import { Sidebar, type View } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { MetricCards } from "./components/MetricCards";
 import { KanbanBoard } from "./components/KanbanBoard";
+import { FocusView } from "./components/FocusView";
 import { JobDrawer } from "./components/JobDrawer";
 import { ActivityLog } from "./components/ActivityLog";
 import { InactiveView } from "./components/InactiveView";
@@ -18,10 +19,18 @@ import type { Job, JobFilters, PipelineStatus } from "./lib/types";
 
 export default function App() {
   const qc = useQueryClient();
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setViewState] = useState<View>("dashboard");
   const [filters, setFilters] = useState<JobFilters>({ sort: "recent" });
   const [selected, setSelected] = useState<Job | null>(null);
+  // The board card the user drilled into (full-screen focus view).
+  const [focused, setFocused] = useState<Job | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+
+  // Switching views always leaves the focus view.
+  const setView = (v: View) => {
+    setFocused(null);
+    setViewState(v);
+  };
 
   const jobs = useQuery({
     queryKey: ["jobs", "board", filters],
@@ -109,6 +118,17 @@ export default function App() {
           <div className="flex-1 overflow-y-auto">
             <SearchResults filters={filters} onOpen={setSelected} />
           </div>
+        ) : focused ? (
+          <FocusView
+            jobs={jobs.data ?? []}
+            selected={focused}
+            onSelect={setFocused}
+            onBack={() => setFocused(null)}
+            onChanged={() => {
+              refresh();
+              api.getJob(focused.job_key).then(setFocused).catch(() => {});
+            }}
+          />
         ) : (
           <div className="flex-1 overflow-y-auto p-6">
             <MetricCards stats={stats.data} />
@@ -143,7 +163,7 @@ export default function App() {
                 ) : (
                   <KanbanBoard
                     jobs={jobs.data ?? []}
-                    onOpen={setSelected}
+                    onOpen={setFocused}
                     onIgnore={(j) => ignore.mutate(j.job_key)}
                     onMove={(key, status) => move.mutate({ key, status })}
                   />
