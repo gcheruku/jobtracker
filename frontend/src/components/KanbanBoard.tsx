@@ -61,23 +61,13 @@ function JobCard({
           }}
           onPointerDown={(e) => e.stopPropagation()}
           title={selected ? "Deselect" : "Select"}
-          className={`group/av relative grid h-8 w-8 shrink-0 place-items-center rounded-md text-xs font-bold transition ${
-            selected
-              ? "bg-indigo-600 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-indigo-100"
+          // No :hover content swap here — on touch, the first tap would only
+          // apply :hover (showing a phantom check) instead of firing the click.
+          className={`grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md text-xs font-bold transition ${
+            selected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
           }`}
         >
-          {selected ? (
-            <Check size={16} />
-          ) : (
-            <>
-              <span className="transition group-hover/av:opacity-0">{initials(job.company)}</span>
-              <Check
-                size={16}
-                className="absolute text-indigo-500 opacity-0 transition group-hover/av:opacity-100"
-              />
-            </>
-          )}
+          {selected ? <Check size={16} /> : initials(job.company)}
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold leading-tight">
