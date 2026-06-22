@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RotateCcw, Trash2, Archive } from "lucide-react";
+import { RotateCcw, Trash2, Archive, ChevronDown } from "lucide-react";
 import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { SourceTag } from "./SourceTag";
@@ -77,34 +77,42 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
   const busy = bulkRestore.isPending || bulkDelete.isPending;
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-slate-500">
-          <Archive size={18} />
-          <p className="text-sm">
-            Jobs not on the active board — skipped, rejected, or expired.
-          </p>
-        </div>
+    <div className="px-4 pb-4 sm:px-6 sm:pb-6">
+      {/* Description scrolls away with the list. */}
+      <div className="flex items-center gap-2 pb-3 pt-4 text-slate-500 sm:pt-6">
+        <Archive size={18} />
+        <p className="text-sm">
+          Jobs not on the active board — skipped, rejected, or expired.
+        </p>
+      </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setSelected(new Set());
-          }}
-          className="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600"
-        >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s === "All" ? "All statuses" : s}
-            </option>
-          ))}
-        </select>
+      {/* Only the dropdown pins flush to the top while the list scrolls. */}
+      <div className="sticky top-0 z-10 -mx-4 mb-4 flex bg-slate-100 px-4 pb-3 pt-1 sm:-mx-6 sm:px-6">
+        <div className="relative w-full sm:ml-auto sm:w-auto">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setSelected(new Set());
+            }}
+            className="w-full cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 pr-8 text-sm font-medium text-slate-600 outline-none focus:border-indigo-400 sm:py-2"
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s === "All" ? "All statuses" : s}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={16}
+            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+        </div>
       </div>
 
       {/* Bulk action bar */}
       {someSelected && (
-        <div className="mb-3 flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm">
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm sm:gap-3 sm:px-4">
           <span className="font-medium text-indigo-700">{selected.size} selected</span>
           <button
             disabled={busy}
@@ -132,7 +140,78 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* Mobile: card list */}
+      <div className="md:hidden">
+        {rows.length > 0 && (
+          <label className="mb-2 flex items-center gap-2 px-1 text-xs font-medium text-slate-500">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+            />
+            Select all ({rows.length})
+          </label>
+        )}
+        <div className="space-y-2">
+          {rows.map((j) => {
+            const lbl = label(j);
+            const style = STATUS_STYLES[lbl as PipelineStatus];
+            const isSel = selected.has(j.job_key);
+            return (
+              <div
+                key={j.job_key}
+                onClick={() => toggle(j.job_key)}
+                className={`cursor-pointer rounded-xl border bg-white p-3 shadow-sm transition ${
+                  isSel
+                    ? "border-indigo-400 bg-indigo-50/50 ring-1 ring-indigo-300"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-xs font-bold text-slate-500">
+                    {initials(j.company)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {j.url ? (
+                      <a
+                        href={j.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="block truncate text-sm font-semibold text-indigo-700 hover:underline"
+                      >
+                        {j.title}
+                      </a>
+                    ) : (
+                      <span className="block truncate text-sm font-semibold">{j.title}</span>
+                    )}
+                    <div className="truncate text-xs text-slate-500">{j.company}</div>
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <SourceTag source={j.source} />
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          style?.chip ?? "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {lbl}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {rows.length === 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+              No {statusFilter === "All" ? "inactive" : statusFilter.toLowerCase()} jobs.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
             <tr>
