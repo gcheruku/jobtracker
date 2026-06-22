@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { Activity, X } from "lucide-react";
@@ -15,12 +15,15 @@ import { SearchResults } from "./components/SearchResults";
 import { SettingsView } from "./components/SettingsView";
 import { api } from "./lib/api";
 import { BOARD_STATUSES, OFF_BOARD_STATUSES } from "./lib/types";
-import type { Job, JobFilters, PipelineStatus } from "./lib/types";
+import { applyBoardFilters } from "./lib/filters";
+import type { BoardFilters, Job, JobFilters, PipelineStatus } from "./lib/types";
 
 export default function App() {
   const qc = useQueryClient();
   const [view, setViewState] = useState<View>("dashboard");
   const [filters, setFilters] = useState<JobFilters>({ sort: "recent" });
+  // Dashboard-only client-side filters (Filters popup).
+  const [boardFilters, setBoardFilters] = useState<BoardFilters>({});
   const [selected, setSelected] = useState<Job | null>(null);
   // The board card the user drilled into (full-screen focus view).
   const [focused, setFocused] = useState<Job | null>(null);
@@ -42,6 +45,11 @@ export default function App() {
   const stats = useQuery({ queryKey: ["stats"], queryFn: api.stats });
 
   const searching = (filters.q ?? "").trim() !== "";
+  // Board jobs after applying the dashboard Filters popup.
+  const visibleJobs = useMemo(
+    () => applyBoardFilters(jobs.data ?? [], boardFilters),
+    [jobs.data, boardFilters]
+  );
   const byStatus = stats.data?.by_status ?? {};
   const boardTotal = BOARD_STATUSES.reduce((n, s) => n + (byStatus[s] ?? 0), 0);
   const mismatchedCount = stats.data?.mismatched ?? 0;
@@ -109,6 +117,16 @@ export default function App() {
             }
             filters={filters}
             setFilters={setFilters}
+            board={
+              view === "dashboard" && !searching
+                ? {
+                    filters: boardFilters,
+                    setFilters: setBoardFilters,
+                    sort: filters.sort ?? "recent",
+                    setSort: (s) => setFilters({ ...filters, sort: s }),
+                  }
+                : undefined
+            }
           />
         </div>
 
@@ -130,7 +148,7 @@ export default function App() {
           </div>
         ) : focused ? (
           <FocusView
-            jobs={jobs.data ?? []}
+            jobs={visibleJobs}
             selected={focused}
             onSelect={setFocused}
             onBack={() => setFocused(null)}
@@ -158,7 +176,7 @@ export default function App() {
                   <h2 className="text-base font-semibold">Application pipeline</h2>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-400">
-                      {jobs.data?.length ?? 0} shown · {boardTotal} active
+                      {visibleJobs.length} shown · {boardTotal} active
                     </span>
                     {!activityOpen && (
                       <button
@@ -177,7 +195,7 @@ export default function App() {
                   </div>
                 ) : (
                   <KanbanBoard
-                    jobs={jobs.data ?? []}
+                    jobs={visibleJobs}
                     onOpen={setFocused}
                     onIgnore={(j) => ignore.mutate(j.job_key)}
                     onMove={(key, status) => move.mutate({ key, status })}

@@ -169,3 +169,12 @@ export interface JobFilters {
   off_board?: boolean;
   only_mismatched?: boolean;
 }
+
+// Client-side dashboard filters set via the Filters popup. Each field carries
+// an operator so you can filter jobs IN or OUT (e.g. salary >= or <=, work
+// mode is / is not). Applied over the already-loaded board jobs.
+export interface BoardFilters {
+  workMode?: { op: "is" | "isNot"; value: string };
+  salary?: { op: "gte" | "lte"; value: number };
+  match?: { op: "gte" | "lte"; value: number };
+}

@@ -1,25 +1,30 @@
-import { Menu, Search, SlidersHorizontal, X } from "lucide-react";
-import type { JobFilters } from "../lib/types";
+import { Menu, Search, X } from "lucide-react";
+import type { BoardFilters, JobFilters } from "../lib/types";
 import { FetchAlertsButton } from "./FetchAlertsButton";
+import { SortMenu } from "./SortMenu";
+import { BoardFilterMenu, BoardFilterChips } from "./BoardFilterMenu";
 
-const WORK_MODES = ["", "Remote", "Hybrid", "On-site"];
-const SORTS = [
-  { v: "recent", label: "Most recent" },
-  { v: "match", label: "Best match" },
-  { v: "company", label: "Company A-Z" },
-  { v: "title", label: "Title A-Z" },
-];
+// Board controls (sort + filters) are dashboard-only; other views have their
+// own filtering.
+export interface BoardControls {
+  filters: BoardFilters;
+  setFilters: (f: BoardFilters) => void;
+  sort: string;
+  setSort: (s: string) => void;
+}
 
 export function TopBar({
   title,
   filters,
   setFilters,
   onMenu,
+  board,
 }: {
   title: string;
   filters: JobFilters;
   setFilters: (f: JobFilters) => void;
   onMenu?: () => void;
+  board?: BoardControls;
 }) {
   return (
     <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur sm:px-6">
@@ -40,73 +45,44 @@ export function TopBar({
         </div>
       </div>
 
-      {/* Row 2: search occupies the full width */}
-      <div className="relative mt-3">
-        <Search
-          size={16}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-        />
-        <input
-          value={filters.q ?? ""}
-          onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-          placeholder="Search roles, companies, locations…"
-          className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-sm outline-none focus:border-indigo-400 focus:bg-white"
-        />
-        {filters.q && (
-          <button
-            onClick={() => setFilters({ ...filters, q: "" })}
-            title="Clear search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-          >
-            <X size={15} />
-          </button>
+      {/* Row 2: search + (dashboard only) sort and filters */}
+      <div className="mt-3 flex items-center gap-2 sm:gap-3">
+        <div className="relative flex-1">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            value={filters.q ?? ""}
+            onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+            placeholder="Search roles, companies, locations…"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-sm outline-none focus:border-indigo-400 focus:bg-white"
+          />
+          {filters.q && (
+            <button
+              onClick={() => setFilters({ ...filters, q: "" })}
+              title="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        {board && (
+          <>
+            <SortMenu value={board.sort} onChange={board.setSort} />
+            <BoardFilterMenu value={board.filters} onChange={board.setFilters} />
+          </>
         )}
       </div>
 
-      {/* Row 3: the two dropdowns, full width side by side */}
-      <div className="mt-3 flex items-center gap-2 sm:gap-3">
-        <select
-          value={filters.work_mode ?? ""}
-          onChange={(e) =>
-            setFilters({ ...filters, work_mode: e.target.value || undefined })
-          }
-          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600"
-        >
-          {WORK_MODES.map((m) => (
-            <option key={m} value={m}>
-              {m || "Any work mode"}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={filters.sort ?? "recent"}
-          onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
-          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600"
-        >
-          {SORTS.map((s) => (
-            <option key={s.v} value={s.v}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-
-        <div className="hidden items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400 sm:flex">
-          <SlidersHorizontal size={15} />
-          Salary
-          <input
-            type="number"
-            placeholder="min"
-            className="w-16 bg-transparent text-slate-700 outline-none"
-            onChange={(e) =>
-              setFilters({
-                ...filters,
-                min_salary: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-          />
+      {/* Row 3: active filter chips (dashboard only) */}
+      {board && (
+        <div className="mt-2 empty:mt-0">
+          <BoardFilterChips value={board.filters} onChange={board.setFilters} />
         </div>
-      </div>
+      )}
     </div>
   );
 }

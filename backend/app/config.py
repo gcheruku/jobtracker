@@ -72,6 +72,9 @@ RESUME_DOCX_PATH = Path(
 # Background fetch cadence and per-run safety cap.
 INGEST_INTERVAL_HOURS = float(os.environ.get("INGEST_INTERVAL_HOURS", "4"))
 INGEST_MAX_MESSAGES = int(os.environ.get("INGEST_MAX_MESSAGES", "60"))
+# Higher cap used for manual "fetch since a date" / "fetch all" runs, which can
+# legitimately scan far more of the label than a routine incremental fetch.
+INGEST_MAX_MESSAGES_ALL = int(os.environ.get("INGEST_MAX_MESSAGES_ALL", "2000"))
 # Run an ingest shortly after startup (in addition to the recurring schedule).
 INGEST_RUN_ON_STARTUP = os.environ.get("INGEST_RUN_ON_STARTUP", "false").lower() == "true"
 

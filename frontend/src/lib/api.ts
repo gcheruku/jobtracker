@@ -171,8 +171,15 @@ export const api = {
   },
 
   // --- gmail ingest ---
-  ingestRun(): Promise<{ started: boolean; detail?: string }> {
-    return http(`/api/ingest/run`, { method: "POST" });
+  ingestRun(opts?: {
+    since_epoch?: number;
+    fetch_all?: boolean;
+  }): Promise<{ started: boolean; detail?: string }> {
+    const p = new URLSearchParams();
+    if (opts?.fetch_all) p.set("fetch_all", "true");
+    if (opts?.since_epoch != null) p.set("since_epoch", String(opts.since_epoch));
+    const qs = p.toString();
+    return http(`/api/ingest/run${qs ? `?${qs}` : ""}`, { method: "POST" });
   },
   ingestStatus(): Promise<IngestStatus> {
     return http<IngestStatus>(`/api/ingest/status`);
