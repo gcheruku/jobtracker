@@ -231,6 +231,15 @@ def run_ingest(
         summary["watermark_advanced_to"] = datetime.fromtimestamp(
             newest_epoch, tz=timezone.utc
         ).isoformat()
+
+        # Fill distance_miles for the jobs we just added (cached geocoding).
+        try:
+            from .distance import backfill_distances
+
+            backfill_distances()
+        except Exception:
+            logger.exception("Distance backfill after ingest failed")
+
         status.update(last_summary=summary, last_run_iso=_now_iso())
         logger.info("Ingest complete: %s", summary)
         return summary

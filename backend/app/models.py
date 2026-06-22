@@ -50,6 +50,9 @@ class Job(SQLModel, table=True):
     ignored: Optional[bool] = Field(default=False)
     # Remote / Hybrid / On-site — powers the Work Mode filter.
     work_mode: Optional[str] = None
+    # Miles from the user's home city (geocoded). Null for remote/ungeocodable
+    # jobs. Powers the dashboard distance filter; backfilled in the background.
+    distance_miles: Optional[float] = None
     # Detailed "Compare with Resume" analysis (persisted so it's viewable later).
     compare_score: Optional[float] = None
     compare_analysis: Optional[str] = None  # full CompareResult JSON

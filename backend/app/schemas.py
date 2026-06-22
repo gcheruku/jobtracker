@@ -47,6 +47,7 @@ class JobOut(BaseModel):
     url: Optional[str]
     salary: Optional[str]
     work_mode: Optional[str]
+    distance_miles: Optional[float]   # miles from home city (null = remote/unknown)
     source: Optional[str]
     status: Optional[str]              # display status (mapped to a pipeline column)
     raw_status: Optional[str]         # original value stored in the DB

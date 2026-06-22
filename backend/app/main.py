@@ -72,6 +72,14 @@ def _startup() -> None:
     init_db()
     start_scheduler()
     logger.info("Ingest scheduled every %.1fh", INGEST_INTERVAL_HOURS)
+
+    # Backfill per-job distances in the background (geocoding is cached and rate
+    # limited, so this can take a while on first run; never blocks startup).
+    import threading
+
+    from .services.distance import backfill_distances
+
+    threading.Thread(target=backfill_distances, name="distance-backfill", daemon=True).start()
     logger.info("Startup complete — docs at /docs")
 
 

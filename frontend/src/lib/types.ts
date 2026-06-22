@@ -35,6 +35,7 @@ export interface Job {
   url: string | null;
   salary: string | null;
   work_mode: string | null;
+  distance_miles: number | null;
   source: string | null;
   status: PipelineStatus;
   raw_status: string | null;
@@ -177,4 +178,5 @@ export interface BoardFilters {
   workMode?: { op: "is" | "isNot"; value: string };
   salary?: { op: "gte" | "lte"; value: number };
   match?: { op: "gte" | "lte"; value: number };
+  distance?: { op: "gte" | "lte"; value: number };
 }

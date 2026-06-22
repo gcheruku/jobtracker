@@ -30,6 +30,8 @@ export function FetchAlertsButton() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>("menu");
   const [since, setSince] = useState("");
+  // Lets the user hide the toast while a fetch keeps running in the background.
+  const [toastHidden, setToastHidden] = useState(false);
   const groupRef = useRef<HTMLDivElement>(null);
 
   const statusQ = useQuery({
@@ -52,6 +54,7 @@ export function FetchAlertsButton() {
     if (polling && statusQ.data && !statusQ.data.running) {
       setPolling(false);
       const s = statusQ.data.last_summary;
+      setToastHidden(false); // surface the result even if the spinner was hidden
       if (statusQ.data.last_error)
         setFlash({ kind: "err", text: `Error: ${statusQ.data.last_error}` });
       else if (s)
@@ -78,6 +81,7 @@ export function FetchAlertsButton() {
   const closeMenu = () => setMenuOpen(false);
 
   function run(opts: RunOpts) {
+    setToastHidden(false);
     start.mutate(opts);
     closeMenu();
   }
@@ -207,17 +211,24 @@ export function FetchAlertsButton() {
         )}
 
       {/* In-progress + result toast */}
-      <Toast open={!!running || !!flash}>
+      <Toast open={(!!running || !!flash) && !toastHidden}>
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
           {running ? (
             <div className="flex items-center gap-3">
               <Loader2 size={20} className="shrink-0 animate-spin text-indigo-600" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold">Fetching alerts…</div>
                 <div className="text-xs text-slate-500">
                   This can take a few minutes. You can keep working.
                 </div>
               </div>
+              <button
+                onClick={() => setToastHidden(true)}
+                title="Hide (fetch keeps running)"
+                className="shrink-0 text-slate-400 hover:text-slate-700"
+              >
+                <X size={16} />
+              </button>
             </div>
           ) : flash ? (
             <div className="flex items-start gap-3">

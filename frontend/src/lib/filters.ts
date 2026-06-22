@@ -20,7 +20,12 @@ export function matchPct(job: Job): number | null {
 }
 
 export function countActiveFilters(f: BoardFilters): number {
-  return (f.workMode ? 1 : 0) + (f.salary ? 1 : 0) + (f.match ? 1 : 0);
+  return (
+    (f.workMode ? 1 : 0) +
+    (f.salary ? 1 : 0) +
+    (f.match ? 1 : 0) +
+    (f.distance ? 1 : 0)
+  );
 }
 
 export function applyBoardFilters(jobs: Job[], f: BoardFilters): Job[] {
@@ -41,6 +46,12 @@ export function applyBoardFilters(jobs: Job[], f: BoardFilters): Job[] {
       if (m == null) return false;
       if (f.match.op === "gte" && m < f.match.value) return false;
       if (f.match.op === "lte" && m > f.match.value) return false;
+    }
+    if (f.distance) {
+      const d = j.distance_miles;
+      if (d == null) return false; // remote / unknown excluded when filtering
+      if (f.distance.op === "gte" && d < f.distance.value) return false;
+      if (f.distance.op === "lte" && d > f.distance.value) return false;
     }
     return true;
   });

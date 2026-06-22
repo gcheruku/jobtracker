@@ -54,6 +54,7 @@ def init_db() -> None:
         # Additive columns for older databases that predate them.
         _add_column_if_missing(conn, "jobs", "ignored", "INTEGER DEFAULT 0")
         _add_column_if_missing(conn, "jobs", "work_mode", "TEXT")
+        _add_column_if_missing(conn, "jobs", "distance_miles", "REAL")
         _add_column_if_missing(conn, "jobs", "compare_score", "REAL")
         _add_column_if_missing(conn, "jobs", "compare_analysis", "TEXT")
         _add_column_if_missing(conn, "jobs", "compare_at", "TEXT")

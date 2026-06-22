@@ -53,6 +53,7 @@ def _to_out(job: Job) -> JobOut:
         url=job.url,
         salary=job.salary,
         work_mode=job.work_mode,
+        distance_miles=job.distance_miles,
         source=job.source,
         status=_display_status(job.status),
         raw_status=job.status,

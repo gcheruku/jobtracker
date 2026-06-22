@@ -118,12 +118,15 @@ function FilterPopup({
   const [salVal, setSalVal] = useState(value.salary ? String(value.salary.value) : "");
   const [matchOp, setMatchOp] = useState<"gte" | "lte">(value.match?.op ?? "gte");
   const [matchVal, setMatchVal] = useState(value.match ? String(value.match.value) : "");
+  const [distOp, setDistOp] = useState<"gte" | "lte">(value.distance?.op ?? "lte");
+  const [distVal, setDistVal] = useState(value.distance ? String(value.distance.value) : "");
 
   function apply() {
     const next: BoardFilters = {};
     if (wmVal) next.workMode = { op: wmOp, value: wmVal };
     if (salVal.trim()) next.salary = { op: salOp, value: Number(salVal) };
     if (matchVal.trim()) next.match = { op: matchOp, value: Number(matchVal) };
+    if (distVal.trim()) next.distance = { op: distOp, value: Number(distVal) };
     onChange(next);
     onClose();
   }
@@ -233,6 +236,36 @@ function FilterPopup({
           </div>
         </Field>
 
+        <Field label="Distance">
+          <div className="flex items-center gap-2">
+            <Segmented
+              options={[
+                { v: "lte", label: "≤" },
+                { v: "gte", label: "≥" },
+              ]}
+              value={distOp}
+              onChange={setDistOp}
+            />
+            <div className="relative flex-1">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={distVal}
+                onChange={(e) => setDistVal(e.target.value)}
+                placeholder="30"
+                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-2.5 pr-10 text-sm outline-none focus:border-indigo-400"
+              />
+              <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                mi
+              </span>
+            </div>
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-400">
+            Remote/unknown-location jobs are hidden while this is set.
+          </p>
+        </Field>
+
         <div className="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white px-4 py-3">
           <button
             onClick={reset}
@@ -270,6 +303,8 @@ export function BoardFilterChips({
     chips.push({ key: "salary", label: `Salary ${OP_LABEL[value.salary.op]} $${value.salary.value.toLocaleString()}` });
   if (value.match)
     chips.push({ key: "match", label: `Match ${OP_LABEL[value.match.op]} ${value.match.value}%` });
+  if (value.distance)
+    chips.push({ key: "distance", label: `Distance ${OP_LABEL[value.distance.op]} ${value.distance.value} mi` });
 
   if (chips.length === 0) return null;
 
