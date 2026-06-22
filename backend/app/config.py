@@ -16,9 +16,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 # Load .env files (dotenv strips surrounding quotes, which os.environ would not).
-# backend/.env takes precedence over a repo-root .env.
+# backend/.env takes precedence over a repo-root .env; in container deploys the
+# mounted /data/.env wins (harmless no-op when that path doesn't exist).
 load_dotenv(REPO_ROOT / ".env")
 load_dotenv(BACKEND_DIR / ".env", override=True)
+load_dotenv("/data/.env", override=True)
 
 # Default to the existing jobs.db that already holds 1,571 real rows.
 DEFAULT_DB_PATH = REPO_ROOT / "jobs.db"

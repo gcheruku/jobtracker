@@ -1,0 +1,33 @@
+name: jobtracker
+
+# Build contexts are relative to this file (deploy/), so ../backend and ../frontend.
+# DATA_DIR is the NAS folder holding all personal data (jobs.db, secrets/,
+# Resume.docx, .env, hf-cache) — it lives OUTSIDE the repo and is never committed.
+services:
+  backend:
+    build:
+      context: ../backend
+    image: jobtracker-backend:latest
+    container_name: jobtracker-backend
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR:-/volume1/docker/jobtracker/data}:/data
+    expose:
+      - "8000"          # internal only; reached via the frontend's /api proxy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ../frontend
+    image: jobtracker-frontend:latest
+    container_name: jobtracker-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-8080}:80"   # open this on your LAN: http://NAS-IP:8080

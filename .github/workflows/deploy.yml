@@ -1,0 +1,31 @@
+name: Deploy to Synology
+
+# Runs on the self-hosted runner inside your NAS (outbound-only; no inbound
+# ports). Triggered on push to main, or manually.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: synology-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted]
+    env:
+      # NAS folder with all personal data (see deploy/.env.example). Override by
+      # setting a repo variable DATA_DIR (Settings -> Secrets and variables ->
+      # Actions -> Variables) if your path differs.
+      DATA_DIR: ${{ vars.DATA_DIR || '/volume1/docker/jobtracker/data' }}
+      WEB_PORT: ${{ vars.WEB_PORT || '8080' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and (re)deploy containers
+        run: |
+          docker compose -f deploy/docker-compose.yml up -d --build --remove-orphans
+
+      - name: Prune old images
+        run: docker image prune -f
