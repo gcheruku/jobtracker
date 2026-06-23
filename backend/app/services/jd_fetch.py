@@ -85,6 +85,38 @@ def _md_inline(node) -> str:
     return inner
 
 
+def _md_list(node, lines: list[str], depth: int) -> None:
+    """Render a <ul>/<ol> to indented Markdown list items, recursing into nested
+    lists. Handles both well-formed nesting (a sub-list inside an <li>) and the
+    malformed shape LinkedIn emits (a sub-<ul> as a direct sibling of <li>s) —
+    the old direct-<li>-only walk dropped every nested bullet."""
+    name = (node.name or "").lower()
+    indent = "  " * depth
+    n = 0
+    for child in node.children:
+        if not isinstance(child, Tag):
+            continue
+        cname = (child.name or "").lower()
+        if cname == "li":
+            # Split the item's own text from any lists nested within it.
+            inline_parts, sublists = [], []
+            for c in child.children:
+                if isinstance(c, Tag) and (c.name or "").lower() in ("ul", "ol"):
+                    sublists.append(c)
+                else:
+                    inline_parts.append(_md_inline(c))
+            n += 1
+            bullet = f"{n}." if name == "ol" else "-"
+            text = "".join(inline_parts).strip()
+            if text:
+                lines.append(f"{indent}{bullet} {text}")
+            for sl in sublists:
+                _md_list(sl, lines, depth + 1)
+        elif cname in ("ul", "ol"):
+            # Malformed: a nested list sitting directly under this one.
+            _md_list(child, lines, depth + 1)
+
+
 def _md_block(node, lines: list[str]) -> None:
     """Walk block-level nodes, appending Markdown blocks/list items to `lines`."""
     if isinstance(node, NavigableString):
@@ -98,9 +130,7 @@ def _md_block(node, lines: list[str]) -> None:
     if name in ("script", "style"):
         return
     if name in ("ul", "ol"):
-        for i, li in enumerate(node.find_all("li", recursive=False), 1):
-            bullet = f"{i}." if name == "ol" else "-"
-            lines.append(f"{bullet} {_md_inline(li).strip()}")
+        _md_list(node, lines, 0)
         lines.append("")
         return
     if re.fullmatch(r"h[1-6]", name):

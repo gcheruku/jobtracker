@@ -19,6 +19,7 @@ import { api } from "../lib/api";
 import { PIPELINE, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, timeAgo } from "../lib/ui";
 import { ComparePanel } from "./ComparePanel";
+import { SourceTag } from "./SourceTag";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -126,7 +127,10 @@ export function JobDetail({
           <h2 className="text-lg font-semibold leading-tight">
             {job.title || "Untitled role"}
           </h2>
-          <p className="text-sm text-slate-500">{job.company}</p>
+          <div className="mt-0.5 flex items-center gap-2">
+            <p className="truncate text-sm text-slate-500">{job.company}</p>
+            <SourceTag source={job.source} />
+          </div>
         </div>
         {onClose && showClose && (
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
