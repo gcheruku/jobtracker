@@ -136,6 +136,15 @@ def _linkedin_guest_url(url: str) -> str | None:
     return f"https://www.linkedin.com/jobs/view/{m.group(1)}" if m else None
 
 
+def _indeed_jobview_url(url: str) -> str | None:
+    """Rewrite an Indeed alert/apply link (/rc/clk, /pagead, ...) to the canonical
+    viewjob page. The original links redirect straight to the employer's ATS
+    (often a JS-only SPA with no extractable JD), whereas viewjob serves a clean
+    JSON-LD JobPosting. Keyed on the `jk` job id present in most Indeed links."""
+    m = re.search(r"[?&]jk=([0-9a-f]+)", url, re.I) or re.search(r"/viewjob/([0-9a-f]+)", url, re.I)
+    return f"https://www.indeed.com/viewjob?jk={m.group(1)}" if m else None
+
+
 # Phrases that appear near the top of an expired/closed posting.
 _EXPIRY_MARKERS = (
     "no longer accepting applications",       # LinkedIn
@@ -159,10 +168,15 @@ def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
     if not url:
         return "", False
     targets: list[str] = []
-    if "linkedin" in url.lower():
+    low = url.lower()
+    if "linkedin" in low:
         guest = _linkedin_guest_url(url)
         if guest:
             targets.append(guest)
+    if "indeed." in low:
+        viewjob = _indeed_jobview_url(url)
+        if viewjob and viewjob != url:
+            targets.append(viewjob)
     targets.append(url)  # also try the original link as a fallback
 
     for target in targets:
