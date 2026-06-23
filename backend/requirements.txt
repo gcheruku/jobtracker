@@ -14,6 +14,9 @@ python-docx>=1.1
 beautifulsoup4>=4.12
 lxml>=5.2
 requests>=2.31
+# Browser-impersonating HTTP client: defeats Cloudflare's TLS-fingerprint bot
+# check so Indeed/Glassdoor job descriptions can be fetched server-side.
+curl_cffi>=0.7
 pgeocode>=0.4
 APScheduler>=3.10
 

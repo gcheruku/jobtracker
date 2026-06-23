@@ -15,6 +15,35 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 
 from ..logging_config import logger
 
+# Indeed (and increasingly Glassdoor) front their pages with Cloudflare, which
+# scores a request's TLS/JA3 fingerprint. Plain `requests` has a Python
+# fingerprint that Cloudflare flags instantly and answers with a JS "Security
+# Check" challenge — so the JD never loads. curl_cffi impersonates a real
+# Chrome TLS handshake and sails past that check. Fall back to requests if the
+# wheel isn't installed (the app still works for non-protected sites).
+try:
+    from curl_cffi import requests as _cffi  # type: ignore
+
+    _IMPERSONATE = "chrome"
+except Exception:  # pragma: no cover - optional dependency
+    _cffi = None
+    _IMPERSONATE = None
+
+
+def _http_get(url: str, timeout: int):
+    """GET a URL with a browser-grade TLS fingerprint when curl_cffi is present,
+    otherwise plain requests. Returns the response (status_code/text/url)."""
+    headers = {"User-Agent": _UA, "Accept-Language": "en-US,en;q=0.9"}
+    if _cffi is not None:
+        return _cffi.get(
+            url,
+            impersonate=_IMPERSONATE,
+            headers={"Accept-Language": "en-US,en;q=0.9"},
+            timeout=timeout,
+            allow_redirects=True,
+        )
+    return requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/123.0 Safari/537.36"
@@ -181,12 +210,7 @@ def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
 
     for target in targets:
         try:
-            resp = requests.get(
-                target,
-                headers={"User-Agent": _UA, "Accept-Language": "en-US,en;q=0.9"},
-                timeout=timeout,
-                allow_redirects=True,
-            )
+            resp = _http_get(target, timeout)
             if resp.status_code >= 400:
                 continue
             expired = _is_expired(resp.text)
