@@ -15,34 +15,66 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 
 from ..logging_config import logger
 
-# Indeed (and increasingly Glassdoor) front their pages with Cloudflare, which
-# scores a request's TLS/JA3 fingerprint. Plain `requests` has a Python
-# fingerprint that Cloudflare flags instantly and answers with a JS "Security
-# Check" challenge — so the JD never loads. curl_cffi impersonates a real
-# Chrome TLS handshake and sails past that check. Fall back to requests if the
-# wheel isn't installed (the app still works for non-protected sites).
+# Job boards score each request's TLS/JA3 fingerprint, and they disagree on what
+# they trust:
+#   * Indeed/LinkedIn front pages with Cloudflare, which flags plain `requests`'
+#     Python fingerprint and answers with a JS "Security Check" — so we need a
+#     real Chrome TLS handshake (curl_cffi impersonation) to get the JD.
+#   * Glassdoor does the opposite: its bot wall blocks the impersonated Chrome
+#     fingerprint (403 "Security" page) but lets a plain `requests` call through.
+# So we don't pick one client globally — we try them in a per-host order and
+# take the first non-error response. curl_cffi is optional; if the wheel isn't
+# installed we still work for the sites that accept plain requests.
 try:
     from curl_cffi import requests as _cffi  # type: ignore
-
-    _IMPERSONATE = "chrome"
 except Exception:  # pragma: no cover - optional dependency
     _cffi = None
-    _IMPERSONATE = None
+
+
+def _get_requests(url: str, timeout: int):
+    return requests.get(
+        url,
+        headers={"User-Agent": _UA, "Accept-Language": "en-US,en;q=0.9"},
+        timeout=timeout,
+        allow_redirects=True,
+    )
+
+
+def _get_cffi(url: str, timeout: int):
+    return _cffi.get(
+        url,
+        impersonate="chrome",
+        headers={"Accept-Language": "en-US,en;q=0.9"},
+        timeout=timeout,
+        allow_redirects=True,
+    )
 
 
 def _http_get(url: str, timeout: int):
-    """GET a URL with a browser-grade TLS fingerprint when curl_cffi is present,
-    otherwise plain requests. Returns the response (status_code/text/url)."""
-    headers = {"User-Agent": _UA, "Accept-Language": "en-US,en;q=0.9"}
-    if _cffi is not None:
-        return _cffi.get(
-            url,
-            impersonate=_IMPERSONATE,
-            headers={"Accept-Language": "en-US,en;q=0.9"},
-            timeout=timeout,
-            allow_redirects=True,
-        )
-    return requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+    """Fetch a URL, trying HTTP clients in the order this host is known to
+    accept, and returning the first response that isn't an error. Returns the
+    last response (possibly a 4xx) so the caller can still inspect it, or None
+    if every attempt raised."""
+    # Glassdoor trusts plain requests and blocks the impersonated fingerprint;
+    # Cloudflare-fronted sites (Indeed/LinkedIn) need the impersonation first.
+    if "glassdoor." in url.lower():
+        clients = [_get_requests, _get_cffi]
+    else:
+        clients = [_get_cffi, _get_requests]
+    clients = [c for c in clients if c is not _get_cffi or _cffi is not None]
+
+    last = None
+    for client in clients:
+        try:
+            resp = client(url, timeout)
+        except Exception as exc:
+            logger.warning("JD fetch client failed for %s: %s", url[:60], exc)
+            continue
+        if resp.status_code < 400:
+            return resp
+        last = resp  # remember the error response, but try the next client
+    return last
+
 
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -241,7 +273,7 @@ def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
     for target in targets:
         try:
             resp = _http_get(target, timeout)
-            if resp.status_code >= 400:
+            if resp is None or resp.status_code >= 400:
                 continue
             expired = _is_expired(resp.text)
             desc = _extract(resp.text)
