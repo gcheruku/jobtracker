@@ -47,6 +47,16 @@ export function FetchAlertsButton() {
       else setFlash(null);
       setPolling(true);
     },
+    // Without this, a failed request (backend down, proxy 5xx, network) would
+    // leave the button doing nothing at all — no spinner, no toast.
+    onError: (e) => {
+      setPolling(false);
+      setToastHidden(false);
+      setFlash({
+        kind: "err",
+        text: e instanceof Error ? e.message : "Couldn't start the fetch.",
+      });
+    },
   });
 
   // When a run we were polling finishes, refresh data and show a summary.

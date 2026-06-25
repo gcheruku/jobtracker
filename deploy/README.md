@@ -39,15 +39,24 @@ EOF
 
 ## Step 2 — Register a self-hosted runner (one time)
 
-1. GitHub → your repo → **Settings → Actions → Runners → New self-hosted runner**.
-   Copy the **registration token** (`AXXXX...`).
+Authenticate the runner with a **Personal Access Token via `ACCESS_TOKEN`**, not
+a one-time registration token. The image re-registers on every container start,
+and a registration token expires in ~1 hour — so a `RUNNER_TOKEN` sends the
+container into a register-fail → exit → restart loop once it lapses. With
+`ACCESS_TOKEN` the entrypoint mints a fresh registration token from the GitHub
+API on each boot, so restarts always work.
+
+1. Create a **classic PAT** with the **`repo`** scope: GitHub → **Settings →
+   Developer settings → Personal access tokens → Tokens (classic)**. A finite
+   expiry (e.g. 1 year) is fine — when it expires the runner loops again, so
+   rotate the PAT and rebuild. Keep the token out of git.
 2. In **Container Manager → Registry**, download `myoung34/github-runner:latest`.
 3. **Container Manager → Container → Create** from that image with:
    - **Volume:** map `/var/run/docker.sock` → `/var/run/docker.sock` (lets the
      runner build/run containers on the NAS).
    - **Environment:**
      - `REPO_URL=https://github.com/<you>/jobtracker`
-     - `RUNNER_TOKEN=<the registration token>`
+     - `ACCESS_TOKEN=<your classic PAT, `repo` scope>`
      - `RUNNER_NAME=synology`
      - `LABELS=self-hosted`
      - `RUNNER_SCOPE=repo`
@@ -55,10 +64,10 @@ EOF
 
    (CLI equivalent over SSH:)
    ```bash
-   docker run -d --restart always --name gh-runner \
+   docker run -d --restart unless-stopped --name gh-runner \
      -v /var/run/docker.sock:/var/run/docker.sock \
      -e REPO_URL=https://github.com/<you>/jobtracker \
-     -e RUNNER_TOKEN=<registration-token> \
+     -e ACCESS_TOKEN=<your-PAT> \
      -e RUNNER_NAME=synology -e LABELS=self-hosted -e RUNNER_SCOPE=repo \
      myoung34/github-runner:latest
    ```
