@@ -70,7 +70,10 @@ def _http_get(url: str, timeout: int):
         except Exception as exc:
             logger.warning("JD fetch client failed for %s: %s", url[:60], exc)
             continue
-        if resp.status_code < 400:
+        # A bot wall sometimes answers 200 with a "Security"/challenge page
+        # instead of a 4xx, which would otherwise short-circuit before we try
+        # the other client. Treat those as failures so the fallback runs.
+        if resp.status_code < 400 and not _looks_blocked(resp.text):
             return resp
         last = resp  # remember the error response, but try the next client
     return last
@@ -251,6 +254,26 @@ def _is_expired(html: str) -> bool:
     soup = BeautifulSoup(html, "lxml")
     top = soup.get_text(" ", strip=True)[:4000].lower()
     return any(marker in top for marker in _EXPIRY_MARKERS)
+
+
+# Distinctive titles/phrases of a bot wall served in place of the real posting.
+# Kept specific so a legitimate JD that merely mentions "security" isn't flagged.
+_BLOCK_MARKERS = (
+    "security | glassdoor",
+    "security check - indeed",
+    "just a moment...",
+    "attention required! | cloudflare",
+    "pardon our interruption",
+    "request unsuccessful. incapsula",
+    "verify you are human",
+    "access to this page has been denied",
+)
+
+
+def _looks_blocked(html: str) -> bool:
+    """True if the response is a bot-wall/challenge page rather than the posting."""
+    head = (html or "")[:4000].lower()
+    return any(marker in head for marker in _BLOCK_MARKERS)
 
 
 def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
