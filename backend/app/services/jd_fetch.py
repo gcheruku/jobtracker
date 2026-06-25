@@ -8,12 +8,29 @@ nothing usable is found (LinkedIn usually works; Indeed/Glassdoor vary).
 from __future__ import annotations
 
 import json
+import os
 import re
+import time
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup, NavigableString, Tag
 
 from ..logging_config import logger
+
+# Per-host bot-wall cooldown. When a site (notably Glassdoor) starts answering
+# with a "Security"/challenge page, repeatedly retrying it — every new job on
+# every scheduled ingest — only deepens the IP-reputation block. So once a host
+# serves a bot wall we stop fetching from it for a cooldown window, giving the
+# IP time to recover. In-memory (resets on restart), which is fine: the worst
+# case is one probe per host per restart. Tune with JD_BLOCK_COOLDOWN_HOURS.
+_BLOCK_COOLDOWN_S = int(float(os.environ.get("JD_BLOCK_COOLDOWN_HOURS", "6")) * 3600)
+_blocked_until: dict[str, float] = {}
+
+
+def _host(url: str) -> str:
+    host = (urlparse(url).hostname or "").lower()
+    return host[4:] if host.startswith("www.") else host
 
 # Job boards score each request's TLS/JA3 fingerprint, and they disagree on what
 # they trust:
@@ -54,7 +71,16 @@ def _http_get(url: str, timeout: int):
     """Fetch a URL, trying HTTP clients in the order this host is known to
     accept, and returning the first response that isn't an error. Returns the
     last response (possibly a 4xx) so the caller can still inspect it, or None
-    if every attempt raised."""
+    if every attempt raised or the host is in a bot-wall cooldown."""
+    host = _host(url)
+    until = _blocked_until.get(host)
+    if until and time.time() < until:
+        logger.info(
+            "Skipping %s — %s in bot-wall cooldown (%dm left)",
+            url[:50], host, max(0, int((until - time.time()) / 60)),
+        )
+        return None
+
     # Glassdoor trusts plain requests and blocks the impersonated fingerprint;
     # Cloudflare-fronted sites (Indeed/LinkedIn) need the impersonation first.
     if "glassdoor." in url.lower():
@@ -64,6 +90,7 @@ def _http_get(url: str, timeout: int):
     clients = [c for c in clients if c is not _get_cffi or _cffi is not None]
 
     last = None
+    blocked = False
     for client in clients:
         try:
             resp = client(url, timeout)
@@ -74,8 +101,18 @@ def _http_get(url: str, timeout: int):
         # instead of a 4xx, which would otherwise short-circuit before we try
         # the other client. Treat those as failures so the fallback runs.
         if resp.status_code < 400 and not _looks_blocked(resp.text):
+            _blocked_until.pop(host, None)  # a success clears any prior cooldown
             return resp
+        if _looks_blocked(resp.text) or resp.status_code in (403, 429):
+            blocked = True
         last = resp  # remember the error response, but try the next client
+
+    if blocked:
+        _blocked_until[host] = time.time() + _BLOCK_COOLDOWN_S
+        logger.warning(
+            "Bot wall hit for %s; pausing JD fetches to it for %dh",
+            host, _BLOCK_COOLDOWN_S // 3600 or 1,
+        )
     return last
 
 
