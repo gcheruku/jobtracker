@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   X,
   ExternalLink,
@@ -20,6 +18,7 @@ import { PIPELINE, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, timeAgo } from "../lib/ui";
 import { ComparePanel } from "./ComparePanel";
 import { SourceTag } from "./SourceTag";
+import { Markdown } from "./Markdown";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -243,9 +242,7 @@ export function JobDetail({
               </div>
               {job.job_description ? (
                 <article className="prose prose-sm max-w-none text-slate-600 prose-headings:font-semibold prose-headings:text-slate-800 prose-h1:text-base prose-h2:text-base prose-h3:text-sm prose-strong:text-slate-800 prose-a:text-indigo-600 prose-li:my-0.5 prose-p:leading-relaxed">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {job.job_description}
-                  </ReactMarkdown>
+                  <Markdown>{job.job_description}</Markdown>
                 </article>
               ) : (
                 <p className="text-sm text-slate-400">

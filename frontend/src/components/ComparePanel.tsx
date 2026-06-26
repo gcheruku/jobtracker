@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Sparkles, Loader2, X, RotateCcw, AlertTriangle } from "lucide-react";
 import { api } from "../lib/api";
+import { Markdown } from "./Markdown";
 import type { CompareResult, Job } from "../lib/types";
 
 function scoreColor(score: number) {
@@ -26,7 +25,7 @@ function Report({ r }: { r: CompareResult }) {
         </div>
       )}
       <article className="prose prose-sm max-w-none prose-headings:font-semibold prose-headings:text-slate-800 prose-h2:text-base prose-h2:mt-5 prose-strong:text-slate-800 prose-li:my-0.5 prose-p:text-slate-600">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{r.report_markdown}</ReactMarkdown>
+        <Markdown>{r.report_markdown}</Markdown>
       </article>
       <div className="mt-5 text-[11px] text-slate-400">
         {r.source === "gemini" ? `Analyzed by ${r.model}` : "Offline heuristic"} ·{" "}

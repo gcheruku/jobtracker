@@ -13,4 +13,20 @@ export default defineConfig({
       "/api": "http://localhost:8000",
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split big third-party libs into their own chunks so they load in
+        // parallel and stay cached across app-code deploys. (react-markdown is
+        // intentionally NOT listed — it's dynamically imported via Markdown.tsx
+        // and gets its own lazy chunk.)
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-dnd": ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
+          "vendor-motion": ["framer-motion"],
+        },
+      },
+    },
+  },
 });
