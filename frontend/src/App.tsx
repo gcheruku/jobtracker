@@ -1,13 +1,17 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "framer-motion";
 import { Activity, ChevronDown, EyeOff, X } from "lucide-react";
 import { Sidebar, type View } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { MetricCards } from "./components/MetricCards";
 import { KanbanBoard } from "./components/KanbanBoard";
-import { FocusView } from "./components/FocusView";
-import { JobDrawer } from "./components/JobDrawer";
+// FocusView and the drawer host pull in JobDetail/ComparePanel/framer-motion,
+// none of which are needed for first paint — load them on demand so the
+// animation library stays off the critical path.
+const FocusView = lazy(() =>
+  import("./components/FocusView").then((m) => ({ default: m.FocusView }))
+);
+const DrawerHost = lazy(() => import("./components/DrawerHost"));
 import { ActivityLog } from "./components/ActivityLog";
 import { InactiveView } from "./components/InactiveView";
 import { MismatchedView } from "./components/MismatchedView";
@@ -29,6 +33,12 @@ export default function App() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [anchorKey, setAnchorKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<Job | null>(null);
+  // The drawer lives behind a lazy boundary; mount it on the first open and
+  // keep it mounted so its slide-out (exit) animation still plays on close.
+  const [drawerMounted, setDrawerMounted] = useState(false);
+  useEffect(() => {
+    if (selected) setDrawerMounted(true);
+  }, [selected]);
   // The board card the user drilled into (full-screen focus view).
   const [focused, setFocused] = useState<Job | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -205,16 +215,22 @@ export default function App() {
             />
           </div>
         ) : focused ? (
-          <FocusView
-            jobs={visibleJobs}
-            selected={focused}
-            onSelect={setFocused}
-            onBack={() => setFocused(null)}
-            onChanged={() => {
-              refresh();
-              api.getJob(focused.job_key).then(setFocused).catch(() => {});
-            }}
-          />
+          <Suspense
+            fallback={
+              <div className="grid flex-1 place-items-center text-slate-400">Loading…</div>
+            }
+          >
+            <FocusView
+              jobs={visibleJobs}
+              selected={focused}
+              onSelect={setFocused}
+              onBack={() => setFocused(null)}
+              onChanged={() => {
+                refresh();
+                api.getJob(focused.job_key).then(setFocused).catch(() => {});
+              }}
+            />
+          </Suspense>
         ) : (
           // No top padding here: the sticky column dropdown pins flush against
           // the top bar (top padding would leave a strip where cards show
@@ -353,20 +369,20 @@ export default function App() {
         )}
       </main>
 
-      <AnimatePresence>
-        {selected && (
-          <JobDrawer
-            key={selected.job_key}
+      {drawerMounted && (
+        <Suspense fallback={null}>
+          <DrawerHost
             job={selected}
             onClose={() => setSelected(null)}
             onChanged={() => {
+              if (!selected) return;
               refresh();
               // keep the drawer's job in sync after a status change
               api.getJob(selected.job_key).then(setSelected).catch(() => {});
             }}
           />
-        )}
-      </AnimatePresence>
+        </Suspense>
+      )}
     </div>
   );
 }

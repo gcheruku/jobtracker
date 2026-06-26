@@ -30,9 +30,15 @@ DATABASE_URL = os.environ.get(
     f"sqlite:///{DEFAULT_DB_PATH}",
 )
 
-# CORS: open by default per the self-hosted "connect from any device" requirement.
-# Override with a comma-separated list for a locked-down deployment.
-_origins = os.environ.get("JOBTRACKER_CORS_ORIGINS", "*")
+# CORS: the app is served same-origin — the frontend calls /api through the
+# nginx proxy — so cross-origin access isn't needed in normal use. Default to
+# localhost dev origins only (no wildcard), which keeps a malicious site in the
+# user's browser from reading the API or issuing preflighted writes to a
+# LAN/VPN-reachable instance. Set JOBTRACKER_CORS_ORIGINS (comma-separated) to
+# add a real origin, or "*" to deliberately open it.
+_origins = os.environ.get(
+    "JOBTRACKER_CORS_ORIGINS", "http://localhost:5173,http://localhost:8080"
+)
 CORS_ORIGINS = ["*"] if _origins.strip() == "*" else [
     o.strip() for o in _origins.split(",") if o.strip()
 ]

@@ -27,11 +27,13 @@ app = FastAPI(
     description="Self-hosted job tracking dashboard API (FastAPI + SQLModel + SQLite).",
 )
 
-# Open CORS so the frontend can connect from any origin/device, per the spec.
+# The SPA calls /api same-origin via the nginx proxy, so CORS isn't needed in
+# normal use; it's locked to localhost dev origins by default (override with
+# JOBTRACKER_CORS_ORIGINS) instead of the old wildcard.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=False,  # wildcard origins require credentials off
+    allow_credentials=False,  # no cookies/credentials are used
     allow_methods=["*"],
     allow_headers=["*"],
 )
