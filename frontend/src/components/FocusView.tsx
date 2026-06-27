@@ -89,6 +89,16 @@ export function FocusView({
     if (first) onSelect(first);
   }
 
+  // After skipping, stay in the side-by-side view and load the next job in the
+  // column (or the previous one if we skipped the last); only fall back to the
+  // board when the column is now empty.
+  function handleSkipped() {
+    const idx = columnJobs.findIndex((j) => j.job_key === selected.job_key);
+    const next = columnJobs[idx + 1] ?? columnJobs[idx - 1];
+    if (next && next.job_key !== selected.job_key) onSelect(next);
+    else onBack();
+  }
+
   return (
     <div className="relative flex flex-1 overflow-hidden">
       {/* Left: jobs in the chosen column (desktop only; mobile is detail-only) */}
@@ -155,6 +165,7 @@ export function FocusView({
             job={selected}
             onChanged={onChanged}
             onClose={onBack}
+            onSkipped={handleSkipped}
             showClose={false}
           />
         </div>

@@ -41,11 +41,15 @@ export function JobDetail({
   job,
   onChanged,
   onClose,
+  onSkipped,
   showClose = true,
 }: {
   job: Job;
   onChanged: () => void;
   onClose?: () => void;
+  // Called after a successful Skip. The focus view uses this to advance to the
+  // next job instead of closing; when omitted, Skip falls back to onClose.
+  onSkipped?: () => void;
   // Render the header close (✕) button. The focus view hides it and uses its
   // own back control, but onClose is still used by the "skip job" action.
   showClose?: boolean;
@@ -110,7 +114,8 @@ export function JobDetail({
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
       qc.invalidateQueries({ queryKey: ["activity"] });
-      onClose?.();
+      // In the focus view, advance to the next job; elsewhere, just close.
+      (onSkipped ?? onClose)?.();
     },
   });
 
