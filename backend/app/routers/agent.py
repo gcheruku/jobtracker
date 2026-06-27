@@ -8,8 +8,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from ..config import ANTHROPIC_API_KEY
-from ..agent.runner import run_agent
+from ..agent import providers
+from ..agent.runner import run_agent, selected_provider
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
@@ -26,8 +26,16 @@ class ChatRequest(BaseModel):
 
 @router.get("/status")
 def agent_status() -> dict:
-    """Whether the assistant is available (an API key is configured)."""
-    return {"enabled": bool(ANTHROPIC_API_KEY)}
+    """Selected provider, which providers have a key, and whether the selected
+    one is usable. Drives the Settings dropdown and the chat 'missing key' warning."""
+    provider = selected_provider()
+    keys = {p: bool(providers.provider_key(p)) for p in providers.PROVIDERS}
+    return {
+        "provider": provider,
+        "providers": keys,
+        "labels": providers.PROVIDER_LABELS,
+        "enabled": keys.get(provider, False),
+    }
 
 
 def _sse(events: Iterator[dict]) -> Iterator[str]:

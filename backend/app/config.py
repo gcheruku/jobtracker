@@ -58,6 +58,13 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
+# Optional OpenAI key for the career assistant (one of the selectable providers).
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+
+# Default agent provider when the user hasn't picked one in Settings.
+AGENT_PROVIDER = os.environ.get("AGENT_PROVIDER", "anthropic")
+
 # Gmail OAuth artifacts and the label that holds the job-alert emails.
 GMAIL_TOKEN_PATH = Path(
     os.environ.get("GMAIL_TOKEN_PATH", str(BACKEND_DIR / "secrets" / "token.json"))

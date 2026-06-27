@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Save, RefreshCw, Check, AlertCircle, SlidersHorizontal } from "lucide-react";
+import { Loader2, Save, RefreshCw, Check, AlertCircle, SlidersHorizontal, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
+import { agentStatus } from "../lib/agent";
 import { SemanticMatchPanel } from "./SemanticMatchPanel";
 import type { Settings } from "../lib/types";
 
@@ -13,6 +14,7 @@ const EMPTY: Settings = {
   min_match_score: null,
   title_keywords: [],
   exclude_companies: [],
+  agent_provider: null,
 };
 
 const numOrNull = (v: string) => (v.trim() === "" ? null : Number(v));
@@ -77,6 +79,19 @@ export function SettingsView() {
     setForm((f) => ({ ...f, ...patch }));
     if (phase !== "idle") setPhase("idle");
   };
+
+  // Assistant provider: its own query + save so changing it doesn't trigger the
+  // "reset the board" prompt that the job-preferences save does.
+  const agentQ = useQuery({ queryKey: ["agent-status"], queryFn: agentStatus });
+  const saveProvider = useMutation({
+    mutationFn: (s: Settings) => api.saveSettings(s),
+    onSuccess: (s) => {
+      qc.setQueryData(["settings"], s);
+      qc.invalidateQueries({ queryKey: ["agent-status"] });
+    },
+  });
+  const provider = form.agent_provider ?? agentQ.data?.provider ?? "anthropic";
+  const providerHasKey = agentQ.data?.providers?.[provider] ?? true;
 
   const summary = statusQ.data?.last_summary;
 
@@ -226,6 +241,56 @@ export function SettingsView() {
           )}
         </div>
       )}
+
+      {/* Career assistant provider */}
+      <div className="mt-8 rounded-xl border border-slate-200 bg-white p-5">
+        <div className="mb-1 flex items-center gap-2">
+          <Sparkles size={18} className="text-indigo-600" />
+          <h2 className="text-lg font-semibold">Career assistant</h2>
+        </div>
+        <p className="mb-4 text-sm text-slate-500">
+          Choose which AI provider powers the chat assistant. Each needs its own API
+          key configured on the backend.
+        </p>
+        <Field label="Provider">
+          <select
+            value={provider}
+            onChange={(e) => {
+              const next = { ...form, agent_provider: e.target.value };
+              setForm(next);
+              saveProvider.mutate(next);
+            }}
+            className={inputCls + " cursor-pointer"}
+          >
+            {(["anthropic", "gemini", "openai"] as const).map((p) => {
+              const label = agentQ.data?.labels?.[p] ?? p;
+              const hasKey = agentQ.data?.providers?.[p];
+              return (
+                <option key={p} value={p}>
+                  {label}
+                  {hasKey === false ? " — no key" : ""}
+                </option>
+              );
+            })}
+          </select>
+        </Field>
+        <div className="mt-2 min-h-[1.25rem] text-xs">
+          {saveProvider.isPending ? (
+            <span className="text-slate-400">Saving…</span>
+          ) : providerHasKey ? (
+            <span className="inline-flex items-center gap-1 text-emerald-600">
+              <Check size={13} /> Key configured for{" "}
+              {agentQ.data?.labels?.[provider] ?? provider}.
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-amber-600">
+              <AlertCircle size={13} /> No API key set for{" "}
+              {agentQ.data?.labels?.[provider] ?? provider} — the assistant won't work
+              until you add it on the backend.
+            </span>
+          )}
+        </div>
+      </div>
 
       <SemanticMatchPanel />
     </div>

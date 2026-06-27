@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, Send, Loader2, Wrench, AlertCircle } from "lucide-react";
-import { agentEnabled, streamAgentChat, type AgentTurn } from "../lib/agent";
+import { agentStatus, streamAgentChat, type AgentStatus, type AgentTurn } from "../lib/agent";
 import { Markdown } from "./Markdown";
 
 type ToolActivity = { name: string; error?: boolean; done?: boolean };
@@ -12,7 +12,8 @@ type ToolActivity = { name: string; error?: boolean; done?: boolean };
  */
 export function AgentChat() {
   const [open, setOpen] = useState(false);
-  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<AgentStatus | null>(null);
+  const enabled = status ? status.enabled : null;
   const [messages, setMessages] = useState<AgentTurn[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -20,9 +21,10 @@ export function AgentChat() {
   const [tools, setTools] = useState<ToolActivity[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Re-check on every open so a provider switch in Settings is reflected.
   useEffect(() => {
-    if (open && enabled === null) agentEnabled().then(setEnabled);
-  }, [open, enabled]);
+    if (open) agentStatus().then(setStatus);
+  }, [open]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -103,11 +105,14 @@ export function AgentChat() {
 
           {/* Conversation */}
           <div ref={scrollRef} className="thin-scroll flex-1 space-y-4 overflow-y-auto p-4">
-            {enabled === false && (
+            {enabled === false && status && (
               <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
                 <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                The assistant isn't configured. Set <code>ANTHROPIC_API_KEY</code> on the
-                backend to enable it.
+                <span>
+                  No API key for <b>{status.labels[status.provider] ?? status.provider}</b>, the
+                  selected assistant provider. Add its key on the backend, or pick a
+                  different provider in <b>Settings → Assistant</b>.
+                </span>
               </div>
             )}
             {messages.length === 0 && enabled !== false && (

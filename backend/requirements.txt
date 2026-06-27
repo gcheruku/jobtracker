@@ -25,6 +25,9 @@ APScheduler>=3.10
 # the full build (Dockerfile arg WITH_SEMANTIC=true); the app degrades gracefully
 # to "no semantic scoring" when it's absent.
 
-# Claude tool-using agent (the chat assistant) + optional LLM analysis. Needs a
-# recent SDK for adaptive thinking + streaming tool use.
+# Career-assistant agent providers. Anthropic needs a recent SDK for adaptive
+# thinking + streaming tool use; OpenAI is one of the selectable providers
+# (Gemini reuses google-genai above). All three are optional at runtime — the
+# assistant only needs the key for the provider selected in Settings.
 anthropic>=0.69
+openai>=1.40

@@ -68,6 +68,7 @@ export interface Settings {
   min_match_score: number | null;
   title_keywords: string[];
   exclude_companies: string[];
+  agent_provider: string | null;
 }
 
 export interface SemanticStatus {

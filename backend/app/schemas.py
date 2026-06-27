@@ -153,6 +153,9 @@ class Settings(BaseModel):
     min_match_score: Optional[int] = None
     title_keywords: List[str] = []       # keep jobs whose title has any of these
     exclude_companies: List[str] = []
+    # Which LLM provider powers the career assistant: anthropic | gemini | openai.
+    # None falls back to the AGENT_PROVIDER default.
+    agent_provider: Optional[str] = None
 
 
 class ApplyResult(BaseModel):

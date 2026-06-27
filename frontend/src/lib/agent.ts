@@ -14,12 +14,19 @@ export type AgentEvent =
 
 export type AgentTurn = { role: "user" | "assistant"; content: string };
 
-export async function agentEnabled(): Promise<boolean> {
+export type AgentStatus = {
+  provider: string;
+  providers: Record<string, boolean>; // provider -> has API key
+  labels: Record<string, string>;
+  enabled: boolean; // selected provider has a key
+};
+
+export async function agentStatus(): Promise<AgentStatus | null> {
   try {
     const r = await fetch(`${BASE}/api/agent/status`);
-    return r.ok && (await r.json()).enabled === true;
+    return r.ok ? ((await r.json()) as AgentStatus) : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
