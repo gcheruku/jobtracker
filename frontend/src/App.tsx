@@ -13,6 +13,7 @@ const FocusView = lazy(() =>
 );
 const DrawerHost = lazy(() => import("./components/DrawerHost"));
 import { ActivityLog } from "./components/ActivityLog";
+import { AgentChat } from "./components/AgentChat";
 import { InactiveView } from "./components/InactiveView";
 import { MismatchedView } from "./components/MismatchedView";
 import { SearchResults } from "./components/SearchResults";
@@ -383,6 +384,8 @@ export default function App() {
           />
         </Suspense>
       )}
+
+      <AgentChat />
     </div>
   );
 }

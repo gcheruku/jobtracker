@@ -25,5 +25,6 @@ APScheduler>=3.10
 # the full build (Dockerfile arg WITH_SEMANTIC=true); the app degrades gracefully
 # to "no semantic scoring" when it's absent.
 
-# Optional: only needed if you set ANTHROPIC_API_KEY for real LLM analysis.
-anthropic>=0.40
+# Claude tool-using agent (the chat assistant) + optional LLM analysis. Needs a
+# recent SDK for adaptive thinking + streaming tool use.
+anthropic>=0.69
