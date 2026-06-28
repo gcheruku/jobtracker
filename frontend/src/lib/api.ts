@@ -164,13 +164,20 @@ export const api = {
   },
 
   // --- semantic matching ---
-  semanticStatus(): Promise<SemanticStatus> {
-    return http<SemanticStatus>(`/api/semantic/status`);
+  semanticStatus(savedOnly = false): Promise<SemanticStatus> {
+    return http<SemanticStatus>(
+      `/api/semantic/status${savedOnly ? "?saved_only=true" : ""}`
+    );
   },
-  runSemantic(recheck = false): Promise<{ started: boolean; detail?: string }> {
-    return http(`/api/semantic/run${recheck ? "?recheck=true" : ""}`, {
-      method: "POST",
-    });
+  runSemantic(
+    recheck = false,
+    savedOnly = false
+  ): Promise<{ started: boolean; detail?: string }> {
+    const qs = new URLSearchParams();
+    if (recheck) qs.set("recheck", "true");
+    if (savedOnly) qs.set("saved_only", "true");
+    const q = qs.toString();
+    return http(`/api/semantic/run${q ? `?${q}` : ""}`, { method: "POST" });
   },
 
   // --- gmail ingest ---

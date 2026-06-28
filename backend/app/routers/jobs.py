@@ -86,7 +86,7 @@ def list_jobs(
         False, description="only off-board jobs: ignored OR Rejected/Expired"
     ),
     only_mismatched: bool = Query(False, description="only preference-mismatched jobs"),
-    sort: str = Query("recent", description="recent | match | company | title"),
+    sort: str = Query("recent", description="recent | match | semantic | company | title"),
 ):
     stmt = select(Job)
 
@@ -143,6 +143,8 @@ def list_jobs(
     reverse = True
     if sort == "match":
         out.sort(key=lambda j: (j.llm_match_pct or j.match_pct or 0), reverse=True)
+    elif sort == "semantic":
+        out.sort(key=lambda j: (j.semantic_score or 0), reverse=True)
     elif sort == "company":
         out.sort(key=lambda j: (j.company or "").lower()); reverse = False
     elif sort == "title":

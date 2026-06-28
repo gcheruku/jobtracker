@@ -3,7 +3,8 @@ import { ArrowUpDown, Check } from "lucide-react";
 
 const SORTS = [
   { v: "recent", label: "Most recent" },
-  { v: "match", label: "Best match" },
+  { v: "semantic", label: "Semantic match" },
+  { v: "match", label: "Best match (AI)" },
   { v: "company", label: "Company A–Z" },
   { v: "title", label: "Title A–Z" },
 ];

@@ -4,9 +4,10 @@ import { Cpu, Loader2, Play, Check } from "lucide-react";
 import { api } from "../lib/api";
 
 /**
- * Runs the offline semantic (sentence-transformers) match on active-board jobs
- * that have no match score, pulling each job description via its link. Shows
- * live progress until finished. Inactive jobs are not scored.
+ * Scores Saved jobs (no match score yet) against the resume using embeddings —
+ * Gemini by default, or the offline sentence-transformers model in WITH_SEMANTIC
+ * builds — pulling each job description via its link. New jobs are scored at
+ * ingest; this backfills existing ones. Shows live progress until finished.
  */
 export function SemanticMatchPanel() {
   const qc = useQueryClient();
@@ -14,12 +15,12 @@ export function SemanticMatchPanel() {
 
   const statusQ = useQuery({
     queryKey: ["semantic-status"],
-    queryFn: api.semanticStatus,
+    queryFn: () => api.semanticStatus(true), // Saved-jobs scope
     refetchInterval: polling ? 1500 : false,
   });
 
   const run = useMutation({
-    mutationFn: (recheck: boolean) => api.runSemantic(recheck),
+    mutationFn: (recheck: boolean) => api.runSemantic(recheck, true),
     onSuccess: () => setPolling(true),
   });
 
@@ -39,18 +40,20 @@ export function SemanticMatchPanel() {
     <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-2 flex items-center gap-2">
         <Cpu size={18} className="text-indigo-600" />
-        <h3 className="text-sm font-semibold">Offline semantic matching</h3>
+        <h3 className="text-sm font-semibold">Semantic matching (Saved jobs)</h3>
       </div>
       <p className="mb-4 text-sm text-slate-500">
-        Computes a resume↔job-description similarity (sentence-transformers) for
-        active jobs that don't already have a match score — pulling each job
-        description from its link. Inactive jobs are skipped.
+        Computes a résumé↔job-description similarity score for <b>Saved</b> jobs
+        that don't already have one — pulling each job description from its link.
+        Then sort the board by <b>Semantic match</b> to triage. New jobs are scored
+        automatically at ingest.
       </p>
 
       {s && !s.available && (
         <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
-          The semantic model isn't installed on the server
-          (<code>pip install sentence-transformers</code>).
+          No embedding backend is available on the server — set{" "}
+          <code>GOOGLE_API_KEY</code> (Gemini embeddings), or build with{" "}
+          <code>WITH_SEMANTIC=true</code> for the offline model.
         </div>
       )}
 
@@ -78,18 +81,18 @@ export function SemanticMatchPanel() {
             disabled={!s?.available || (s?.eligible ?? 0) === 0}
             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
-            <Play size={15} /> Run semantic matching
+            <Play size={15} /> Score Saved jobs
           </button>
           <button
             onClick={() => run.mutate(true)}
             disabled={!s?.available}
-            title="Re-check all unscored active jobs, moving expired postings off the board"
+            title="Re-check Saved jobs (incl. already-attempted), moving expired postings off the board"
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           >
             Re-check / expired
           </button>
           <span className="text-xs text-slate-500">
-            {s?.eligible ?? 0} job{(s?.eligible ?? 0) === 1 ? "" : "s"} to score
+            {s?.eligible ?? 0} Saved job{(s?.eligible ?? 0) === 1 ? "" : "s"} to score
           </span>
           {s?.last_run_iso && !s.last_error && (s?.eligible ?? 0) >= 0 && (
             <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
