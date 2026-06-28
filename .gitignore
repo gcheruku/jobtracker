@@ -41,3 +41,6 @@ credentials.json
 
 # OS
 .DS_Store
+
+# Repo-prep prompt — local working note, not part of the public project.
+go_public.md

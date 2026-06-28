@@ -1,78 +1,201 @@
-# JobTrack — Self-Hosted Job Tracking Dashboard
+# JobTrack
 
-A self-hosted job tracker with a **FastAPI + SQLite** backend and a
-**Vite + React + TypeScript + Tailwind** frontend. It ingests job-alert emails
-from Gmail, scores them against your resume, and gives you a Kanban board,
-filtering, preferences, and an AI resume-fit analysis.
+> A self-hosted, AI-powered job-search tracker. It ingests job-alert emails from
+> Gmail, fetches and scores each posting against your résumé, and tracks it
+> through a Kanban pipeline — with a provider-selectable, tool-using AI assistant
+> on top.
 
-> No personal data is in this repo — your resume, Gmail credentials, `.env`, and
-> the SQLite database are all gitignored. Sample/template files are provided so
-> you can supply your own.
+<p align="left">
+  <a href="https://github.com/gcheruku/jobtracker/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/gcheruku/jobtracker/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/License-MIT-green">
+</p>
 
-## Features
-- **Kanban board** (Saved / Applied / Interviewing / Offer) with drag-and-drop.
+JobTrack is a single-user application that runs entirely on a home Synology NAS,
+is reachable privately over Tailscale, and deploys itself via a self-hosted
+GitHub Actions runner on every push to `main`. It is built to be **fully
+functional with no API keys** (graceful degradation throughout) and to make the
+**production AI patterns** — agentic tool use, multi-LLM abstraction, RAG-style
+résumé grounding, semantic search, streaming, and guardrails — concrete and
+inspectable.
+
+---
+
+## Screenshots
+
+| Kanban board | AI assistant |
+|---|---|
+| ![Kanban board](docs/screenshots/board.png) | ![AI assistant](docs/screenshots/assistant.png) |
+
+| Résumé compare | Settings |
+|---|---|
+| ![Compare with Resume](docs/screenshots/ai-compare.png) | ![Settings](docs/screenshots/settings.png) |
+
+> Screenshot placeholders — see [docs/screenshots/](docs/screenshots/).
+
+---
+
+## Key features
+
+- **Kanban pipeline** (Saved → Applied → Interviewing → Offer) with drag-and-drop
+  and optimistic updates.
 - **Gmail ingestion** of Dice/LinkedIn/Glassdoor/Indeed alerts — scheduled every
-  4h and via a manual **Fetch alerts** button; deduped by posting id.
-- **Offline semantic match** (sentence-transformers) of your resume vs each job.
-- **AI "Compare with Resume"** — detailed Gemini analysis (match score, skill
-  gaps, red flags, improvements).
+  4h and via a manual **Fetch alerts** button; deduped by canonical posting id.
+- **Job-description fetching** that defeats per-site anti-bot walls (browser TLS
+  impersonation, link rewriting, host-scoped cooldowns).
+- **Résumé-fit analysis** — an LLM match score + Markdown report, with a
+  deterministic offline heuristic fallback when no key is present.
+- **Offline semantic matching** (sentence-transformers) — a no-LLM-cost
+  résumé↔JD signal computed at ingest time (optional build flag).
+- **Provider-selectable AI assistant** — a tool-using agent over your pipeline,
+  backed by Anthropic, Gemini, or OpenAI, streamed over SSE.
 - **Preferences** (salary / location+distance / min score / keywords) that move
   non-matching jobs to a **Mismatched** view; skipped/expired/rejected go to
   **Inactive**.
-- **Global search**, job drawer with notes & checklists, expiry detection.
+- **Global search**, a job drawer with notes & checklists, and expiry detection.
 
-## Setup
+---
 
-### Prerequisites
-- Python 3.11+ and Node 18+
-- (Optional) A Google **Gemini API key** for the AI compare, and Gmail OAuth
-  credentials for ingestion.
+## Architecture at a glance
 
-### 1. Backend
+```mermaid
+flowchart LR
+    subgraph NAS["Synology NAS (private, outbound-only)"]
+        FE["frontend<br/>nginx + React SPA"]
+        BE["backend<br/>FastAPI + APScheduler"]
+        DB[("SQLite /data/jobs.db")]
+        FE -- "/api proxy" --> BE
+        BE --> DB
+    end
+    Gmail["Gmail (Job alerts)"] --> BE
+    Browser["Browser (Tailscale)"] --> FE
+    BE -->|outbound| LLM["LLM APIs<br/>Anthropic / Gemini / OpenAI"]
+    BE -->|outbound| Sites["Indeed / LinkedIn / Glassdoor"]
+    GH["GitHub Actions"] -->|self-hosted runner| NAS
+```
+
+Full write-up in [docs/Architecture.md](docs/Architecture.md). The AI assistant
+is documented in [docs/AI-Agent.md](docs/AI-Agent.md).
+
+---
+
+## Technology stack
+
+**Backend** — FastAPI · Uvicorn · SQLModel (SQLite) · APScheduler · Pydantic ·
+BeautifulSoup + curl_cffi (scraping) · Anthropic / google-genai / OpenAI SDKs ·
+sentence-transformers (optional).
+
+**Frontend** — React 18 · TypeScript · Vite · TanStack Query · Tailwind CSS ·
+@dnd-kit · react-markdown.
+
+**Infra** — Docker Compose · self-hosted GitHub Actions runner · nginx ·
+Tailscale.
+
+---
+
+## Quick start
+
+> Requires Python 3.11+ and Node 18+. The app runs with **no keys** (reduced
+> features); add keys to unlock AI. Full guide: [docs/Development.md](docs/Development.md).
+
 ```bash
+# 1. Backend
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # then edit (see below)
-uvicorn app.main:app --port 8000   # no --reload (in-process scheduler)
-```
-On first run the app **creates a fresh `jobs.db`** automatically. API docs at
-http://localhost:8000/docs.
+cp .env.example .env            # optional: add keys
+uvicorn app.main:app --port 8000   # creates a fresh jobs.db on first run
 
-Edit `.env` (all optional — the app runs without them, with reduced features):
-- `GOOGLE_API_KEY` — enables Gemini "Compare with Resume".
-- `RESUME_DOCX_PATH` — path to your resume `.docx` (default `../Resume.docx`),
-  used for match scoring. Provide your own; it is **not** in the repo.
-- Gmail ingestion: put OAuth files in `backend/secrets/` — see
-  [`backend/secrets/README.md`](backend/secrets/README.md).
-- See [`backend/.env.example`](backend/.env.example) for the full list.
-
-### 2. Frontend
-```bash
+# 2. Frontend (second terminal)
 cd frontend
 npm install
-npm run dev          # http://localhost:5173 (proxies /api -> :8000)
+npm run dev                     # http://localhost:5173
 ```
 
-### Production / remote
-```bash
-cd frontend && VITE_API_BASE=http://YOUR_SERVER:8000 npm run build
-# serve frontend/dist statically (nginx, python -m http.server, or FastAPI StaticFiles)
-```
-CORS is open by default (`JOBTRACKER_CORS_ORIGINS` to restrict).
+API docs: <http://localhost:8000/docs>.
 
-## Project layout
+---
+
+## Deployment
+
+Push to `main` → a self-hosted GitHub Actions runner on the NAS runs
+`docker compose up -d --build`. No inbound ports; remote access via Tailscale.
+See [docs/Deployment.md](docs/Deployment.md) for the full NAS setup, CI/CD
+pipeline, and the slim-vs-semantic build flag.
+
+---
+
+## Why I built this
+
+JobTrack started as a real personal need — tracking a job search across four job
+boards — and became a deliberate vehicle for hands-on, production-grade
+experience with the patterns that now define applied AI engineering:
+
+- **Agentic AI** — a hand-written tool-use loop (not an SDK auto-runner) so
+  streaming, tracing, and termination are explicit and controllable.
+- **Tool calling** — a typed tool surface (`search_jobs`, `get_job`,
+  `get_pipeline_stats`, `compare_resume_to_job`) the model invokes to reason over
+  live, per-user data.
+- **Multi-LLM architecture** — one neutral event contract with three thin
+  provider adapters (Anthropic / Gemini / OpenAI), selectable at runtime.
+- **RAG / grounding** — answers and scores are grounded in the user's actual
+  résumé and the fetched job descriptions, not the model's priors.
+- **Semantic search** — embedding-based résumé↔JD similarity as a no-LLM-cost
+  match signal.
+- **AI guardrails** — read-only tools, a step cap, token tracing, and graceful
+  "no key" degradation.
+- **Streaming** — SSE-over-POST transport with a neutral event stream the UI
+  renders incrementally (text, tool calls, tool results, usage).
+- **Production AI systems** — observability, cost control, idempotent pipelines,
+  and offline-first fallbacks so nothing hard-fails.
+- **AI-assisted software engineering** — the project itself was specified and
+  built with AI tooling; the prompts are kept under [`prompts/`](prompts/) for
+  provenance.
+
+A candid self-assessment lives in
+[PORTFOLIO_REVIEW.md](PORTFOLIO_REVIEW.md).
+
+---
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [docs/Architecture.md](docs/Architecture.md) | System design, data model, core flows, diagrams |
+| [docs/AI-Agent.md](docs/AI-Agent.md) | The agentic layer: loop, providers, tools, guardrails |
+| [docs/Deployment.md](docs/Deployment.md) | NAS deployment, CI/CD, operations |
+| [docs/Development.md](docs/Development.md) | Local setup, configuration, troubleshooting |
+| [TECHNICAL_DEBT.md](TECHNICAL_DEBT.md) | Known debt and improvement opportunities |
+| [ROADMAP.md](ROADMAP.md) | Planned direction |
+| [FAQ.md](FAQ.md) | Common questions |
+| [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CHANGELOG.md](CHANGELOG.md) | Project process |
+
+---
+
+## Repository layout
+
 ```
-jobtracker/
-├── backend/          FastAPI app (app/), requirements.txt, .env.example, secrets/
-├── frontend/         Vite + React app (src/components, src/lib)
-├── prompts/          The prompts used to build this + the figma design
-└── README.md
+backend/    FastAPI app (routers thin, services do the work, agent/ is the AI layer)
+frontend/   Vite + React SPA (components, lib)
+deploy/     docker-compose + self-hosted runner config
+docs/        Architecture, AI-Agent, Deployment, Development, screenshots
+prompts/    The prompts used to build the app, kept for provenance
 ```
 
-## Notes
-- The startup migration is additive and idempotent (`ALTER TABLE ADD COLUMN` +
-  `create_all`) — it never drops or rewrites rows, so it safely upgrades an
-  existing `jobs.db` or bootstraps a new one.
-- Without a Gemini key, "Compare with Resume" falls back to an offline heuristic;
-  without Gmail credentials, ingestion is disabled but everything else works.
+---
+
+## Privacy & data
+
+No personal data is in this repository. Your résumé, Gmail credentials, `.env`,
+and the SQLite database are gitignored; template/sample files are provided so you
+can supply your own. See [SECURITY.md](SECURITY.md).
+
+---
+
+## License
+
+[MIT](LICENSE) © Gopal Cheruku

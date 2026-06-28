@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/gcheruku/jobtracker/blob/main/SECURITY.md
+    about: Please report security vulnerabilities privately, not as public issues.
+  - name: Question / FAQ
+    url: https://github.com/gcheruku/jobtracker/blob/main/FAQ.md
+    about: Check the FAQ before opening an issue.
