@@ -21,7 +21,7 @@ flowchart TB
         FE -->|/api proxy| BE
         BE --> DATA[("/data volume<br/>jobs.db · secrets · Resume.docx · .env")]
     end
-    Tailnet["Devices on tailnet"] -->|Tailscale (WireGuard)| FE
+    Tailnet["Devices on tailnet"] -->|Tailscale / WireGuard| FE
 ```
 
 ## 2. CI/CD pipeline
