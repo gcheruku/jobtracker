@@ -38,14 +38,15 @@ templates and setup docs.
 
 ### Committed artifacts reviewed and kept (intentional)
 
-- `prompts/figma_design.png` — UI design reference (no personal data).
-- `prompts/reference_email_parsers.py` — generic parser reference.
 - `backend/secrets/*.example.json`, `*.env.example` — templates, no real values.
+- `prompts/*.md` — the build prompts, kept for provenance.
 
 ## Actions taken during prep
 
 - Added `go_public.md` (the repo-prep prompt) to `.gitignore` — local working
   note, not part of the public project.
+- Removed `prompts/figma_design.png` and `prompts/reference_email_parsers.py`
+  from the repo (kept local only).
 - Moved the personal/local `ARCHITECTURE.md` into a polished, public
   [`docs/Architecture.md`](Architecture.md) and removed the local-only copy and
   its `.gitignore` exclusion.

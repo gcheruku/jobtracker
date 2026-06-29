@@ -13,6 +13,3 @@ UI screenshots referenced from the root `README.md`.
 > components) populated with **synthetic sample data** — fictional companies
 > (Globex, Initech, Hooli, …) and a placeholder resume analysis — so no personal
 > job-search data is shown.
-
-A design reference for the original UI lives at
-[`prompts/figma_design.png`](../../prompts/figma_design.png).

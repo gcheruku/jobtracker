@@ -2,7 +2,7 @@ Act as an Elite Full-Stack Software Engineer and System Architect. I want to bui
 
 Review the product design requirements below, present tech stack recommendations, and then generate the code systematically.
 
-Use @figma_design.png as the base design for the user interface.
+Use a clean, modern dashboard design for the user interface.
 
 =========================================
 PRODUCT DESIGN REQUIREMENTS
