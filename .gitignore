@@ -1,0 +1,46 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+backend/.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/*.tsbuildinfo
+
+# Data / uploads (keep these local; they hold your real personal job data and
+# should not be committed to version control).
+jobs.db
+backend/jobs.db
+*.db-journal
+jobs.db.backup-*
+uploads/
+
+# Secrets & personal documents — MUST NOT be committed
+backend/.env
+.env
+*.docx
+# Ignore everything in secrets/ EXCEPT the *.example.json templates + README.
+backend/secrets/*
+!backend/secrets/*.example.json
+!backend/secrets/README.md
+token.json
+credentials.json
+# (the example templates are explicitly un-ignored above)
+!backend/secrets/credentials.example.json
+!backend/secrets/token.example.json
+# any *.db (jobs.db handled above) — never commit databases
+*.db
+
+# Local tooling
+.claude/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Repo-prep prompt — local working note, not part of the public project.
+go_public.md

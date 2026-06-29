@@ -1,0 +1,12 @@
+# Never bake personal data or local cruft into the image.
+.venv/
+__pycache__/
+*.pyc
+.env
+secrets/
+*.db
+*.db-journal
+jobs.db.backup-*
+uploads/
+hf-cache/
+Resume*.docx

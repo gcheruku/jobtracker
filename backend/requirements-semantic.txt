@@ -1,0 +1,6 @@
+# Heavy, optional dependency for offline semantic resume<->JD matching.
+# Pulls in PyTorch (~hundreds of MB, RAM-hungry). Only installed when the backend
+# image is built with WITH_SEMANTIC=true. On low-RAM hosts (e.g. a 2 GB Synology
+# DS220+) leave it out and rely on the Gemini "Compare with Resume" feature, which
+# needs no local model.
+sentence-transformers>=3.0

@@ -1,0 +1,33 @@
+# Self-hosted GitHub Actions runner for Synology Container Manager.
+#
+# Create this as a PROJECT in Container Manager (Project -> Create -> paste this
+# as the docker-compose.yml).
+#
+# Auth: use a Personal Access Token via ACCESS_TOKEN (NOT a one-time
+# RUNNER_TOKEN). The image re-registers on every container start; a
+# registration token expires in ~1 hour, so a RUNNER_TOKEN sends the container
+# into a register-fail -> exit -> restart loop once it lapses. With ACCESS_TOKEN
+# the entrypoint fetches a fresh registration token from the GitHub API each
+# boot, so restarts always work.
+#   - Create a classic PAT with the `repo` scope (Settings -> Developer settings
+#     -> Personal access tokens -> Tokens (classic)). A finite expiry (e.g. 1
+#     year) is fine; when it expires the runner loops again — rotate the PAT and
+#     rebuild this project. Keep the token out of git.
+#
+# The docker.sock mount lets the runner build and run the app containers on the
+# NAS itself. The runner only makes OUTBOUND calls to GitHub.
+
+services:
+  runner:
+    image: myoung34/github-runner:latest
+    container_name: gh-runner
+    restart: unless-stopped
+    environment:
+      REPO_URL: https://github.com/gcheruku/jobtracker
+      ACCESS_TOKEN: PASTE_YOUR_PERSONAL_ACCESS_TOKEN   # classic PAT, `repo` scope
+      RUNNER_NAME: synology-ds220
+      RUNNER_SCOPE: repo
+      LABELS: self-hosted
+      DISABLE_AUTO_UPDATE: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

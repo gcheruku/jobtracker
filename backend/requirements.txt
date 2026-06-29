@@ -1,0 +1,33 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+sqlmodel>=0.0.16
+python-multipart>=0.0.9
+pypdf>=4.0
+python-dotenv>=1.0
+
+# Gmail job-alert ingestion + Gemini scoring
+google-api-python-client>=2.130
+google-auth>=2.30
+google-auth-oauthlib>=1.2
+google-genai>=1.0
+python-docx>=1.1
+beautifulsoup4>=4.12
+lxml>=5.2
+requests>=2.31
+# Browser-impersonating HTTP client: defeats Cloudflare's TLS-fingerprint bot
+# check so Indeed/Glassdoor job descriptions can be fetched server-side.
+curl_cffi>=0.7
+pgeocode>=0.4
+APScheduler>=3.10
+
+# NOTE: offline semantic resume<->JD matching (sentence-transformers / Torch) is
+# kept in requirements-semantic.txt so the base image stays small. Install it for
+# the full build (Dockerfile arg WITH_SEMANTIC=true); the app degrades gracefully
+# to "no semantic scoring" when it's absent.
+
+# Career-assistant agent providers. Anthropic needs a recent SDK for adaptive
+# thinking + streaming tool use; OpenAI is one of the selectable providers
+# (Gemini reuses google-genai above). All three are optional at runtime — the
+# assistant only needs the key for the provider selected in Settings.
+anthropic>=0.69
+openai>=1.40
