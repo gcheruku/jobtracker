@@ -1,19 +1,18 @@
 # Screenshots
 
-Place UI screenshots here and reference them from the root `README.md`.
+UI screenshots referenced from the root `README.md`.
 
-Suggested set (filenames the README links to):
-
-| File | What to capture |
+| File | Screen |
 |---|---|
-| `board.png` | The Kanban board (Saved / Applied / Interviewing / Offer) with cards |
-| `job-detail.png` | A job drawer / focus view with the JD and match scores |
-| `ai-compare.png` | "Compare with Resume" output (match score + report) |
-| `assistant.png` | The AI assistant chat with a tool trace visible |
-| `settings.png` | Preferences (salary / distance / min score / agent provider) |
+| `board.png` | Kanban pipeline (Saved / Applied / Interviewing / Offer) |
+| `assistant.png` | The tool-using AI career assistant, mid-answer with its tool trace |
+| `ai-compare.png` | "AI Resume Fit" — match score + analysis report |
+| `settings.png` | Preferences (salary / distance / min score / keywords / assistant provider) |
 
-> These are placeholders. Until real screenshots are added, the README links
-> render as broken-image alt text, which is expected.
+> These render the real application UI (the app's own compiled styles and
+> components) populated with **synthetic sample data** — fictional companies
+> (Globex, Initech, Hooli, …) and a placeholder résumé analysis — so no personal
+> job-search data is shown.
 
 A design reference for the original UI lives at
 [`prompts/figma_design.png`](../../prompts/figma_design.png).

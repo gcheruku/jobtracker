@@ -35,7 +35,8 @@ inspectable.
 |---|---|
 | ![Compare with Resume](docs/screenshots/ai-compare.png) | ![Settings](docs/screenshots/settings.png) |
 
-> Screenshot placeholders — see [docs/screenshots/](docs/screenshots/).
+> The real UI with synthetic sample data (fictional companies, no personal job
+> data) — see [docs/screenshots/](docs/screenshots/).
 
 ---
 
