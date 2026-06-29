@@ -112,7 +112,7 @@ major financial institutions). The goal is to be useful, not flattering.
 ## Recommendations before making the repository public
 
 - [x] Verify no secrets are committed or in git history (done — clean).
-- [x] Confirm `.env`, `jobs.db`/backups, OAuth tokens, and the résumé are
+- [x] Confirm `.env`, `jobs.db`/backups, OAuth tokens, and the resume are
       gitignored (done).
 - [x] Professional README, docs set, diagrams, and GitHub project files (done).
 - [x] Add a starter test suite (done — `backend/tests/`, 57 pytest tests over the

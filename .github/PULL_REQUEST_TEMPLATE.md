@@ -23,7 +23,7 @@ Describe your testing:
 - [ ] Routers stayed thin; logic lives in `services/`
 - [ ] Config additions go through `app/config.py`
 - [ ] Graceful degradation preserved (no key → clear message, no crash)
-- [ ] No secrets, real résumé, or `jobs.db` committed
+- [ ] No secrets, real resume, or `jobs.db` committed
 - [ ] Docs / CHANGELOG updated if behavior changed
 
 ## Related issues

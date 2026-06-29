@@ -43,7 +43,7 @@ export function SemanticMatchPanel() {
         <h3 className="text-sm font-semibold">Semantic matching (Saved jobs)</h3>
       </div>
       <p className="mb-4 text-sm text-slate-500">
-        Computes a résumé↔job-description similarity score for <b>Saved</b> jobs
+        Computes a resume↔job-description similarity score for <b>Saved</b> jobs
         that don't already have one — pulling each job description from its link.
         Then sort the board by <b>Semantic match</b> to triage. New jobs are scored
         automatically at ingest.

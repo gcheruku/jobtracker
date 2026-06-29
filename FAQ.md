@@ -3,14 +3,14 @@
 ### What is JobTrack?
 
 A self-hosted, single-user job-search tracker. It ingests job-alert emails from
-Gmail, fetches and scores each posting against your résumé, and tracks it through
+Gmail, fetches and scores each posting against your resume, and tracks it through
 a Kanban pipeline — with a tool-using AI assistant on top. See the
 [README](README.md).
 
 ### Do I need API keys to run it?
 
 No. The app runs with **no keys** (with reduced features): you get the board,
-search, preferences, manual entry, and an offline keyword-overlap résumé
+search, preferences, manual entry, and an offline keyword-overlap resume
 heuristic. Adding a Gemini/Anthropic/OpenAI key unlocks LLM scoring and the AI
 assistant; Gmail OAuth unlocks email ingestion.
 
@@ -18,12 +18,12 @@ assistant; Gmail OAuth unlocks email ingestion.
 
 Three, and the AI assistant is selectable between them in Settings:
 **Anthropic (Claude)**, **Google Gemini**, and **OpenAI**. Only the *selected*
-provider needs a key. Résumé-fit "Compare with Resume" uses Gemini (or the
+provider needs a key. Resume-fit "Compare with Resume" uses Gemini (or the
 offline heuristic).
 
 ### Is any of my personal data in this repository?
 
-No. Your résumé, `.env`, Gmail credentials/token, and the SQLite database are all
+No. Your resume, `.env`, Gmail credentials/token, and the SQLite database are all
 gitignored. Only example/template files are committed. See [SECURITY.md](SECURITY.md).
 
 ### How does it fetch job descriptions if job boards block scrapers?
@@ -37,7 +37,7 @@ challenge page. Details in [docs/Architecture.md](docs/Architecture.md#52-job-de
 ### Why an agent instead of a single LLM prompt?
 
 The questions are open-ended and need live, per-user data — the model must decide
-which jobs to inspect, read their details, and compare them to the résumé. That
+which jobs to inspect, read their details, and compare them to the resume. That
 requires tool use and a loop, not one call. See [docs/AI-Agent.md](docs/AI-Agent.md).
 
 ### Can the AI assistant change my data?

@@ -11,7 +11,7 @@ UI screenshots referenced from the root `README.md`.
 
 > These render the real application UI (the app's own compiled styles and
 > components) populated with **synthetic sample data** — fictional companies
-> (Globex, Initech, Hooli, …) and a placeholder résumé analysis — so no personal
+> (Globex, Initech, Hooli, …) and a placeholder resume analysis — so no personal
 > job-search data is shown.
 
 A design reference for the original UI lives at

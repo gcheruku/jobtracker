@@ -1,7 +1,7 @@
 # Architecture
 
 JobTrack is a self-hosted job-search tracker that ingests job-alert emails,
-enriches and scores them against a résumé, and presents them on a Kanban
+enriches and scores them against a resume, and presents them on a Kanban
 pipeline — with a provider-selectable, tool-using AI assistant on top. This
 document explains the system end to end.
 
@@ -14,7 +14,7 @@ document explains the system end to end.
 ## 1. Overview
 
 JobTrack reads job-alert emails from Gmail, parses the postings, fetches each
-job description from the source site, scores every job against the user's résumé
+job description from the source site, scores every job against the user's resume
 (LLM + an offline semantic fallback), and tracks them through a pipeline
 (Saved → Applied → Interviewing → Offer). It runs entirely on a home Synology
 NAS, reachable privately over Tailscale, and deploys itself via a self-hosted
@@ -50,7 +50,7 @@ Key properties:
 - **Two app containers:** `frontend` (nginx serving the built SPA and proxying
   `/api`) and `backend` (FastAPI). A third container, `gh-runner`, performs
   deploys.
-- **State** lives in a mounted `/data` volume (SQLite DB, secrets, résumé,
+- **State** lives in a mounted `/data` volume (SQLite DB, secrets, resume,
   `.env`) — outside the repo, never committed.
 
 ---
@@ -62,8 +62,8 @@ Key properties:
 | Backend | **FastAPI + Uvicorn** (Python 3.12) | Async, typed (Pydantic), auto OpenAPI docs |
 | Persistence | **SQLite + SQLModel** | Single-user, file-backed, zero-ops; SQLModel = SQLAlchemy + Pydantic |
 | Scheduling | **APScheduler** (in-process) | Periodic ingestion without a separate worker/cron |
-| LLM | **Anthropic / Google Gemini / OpenAI** SDKs | Résumé analysis + the agent; provider-selectable |
-| Semantic match | **sentence-transformers** (optional) | Offline résumé↔JD scoring with no LLM cost |
+| LLM | **Anthropic / Google Gemini / OpenAI** SDKs | Resume analysis + the agent; provider-selectable |
+| Semantic match | **sentence-transformers** (optional) | Offline resume↔JD scoring with no LLM cost |
 | Frontend | **React 18 + TypeScript + Vite** | Fast SPA build; no SSR needed (single-user, dynamic, behind auth) |
 | Data fetching | **TanStack Query** | Server-state cache, optimistic updates, invalidation |
 | Styling | **Tailwind CSS** | Utility-first; small, consistent UI |
@@ -91,14 +91,14 @@ backend/
       gmail_client.py     Gmail OAuth + message fetch
       email_parser.py     Email -> provider + links/payload
       alert_parsers.py    Deterministic Indeed/Glassdoor parsers
-      gemini_client.py    Gemini extraction + résumé-fit analysis
+      gemini_client.py    Gemini extraction + resume-fit analysis
       ingest.py           Orchestrates the ingestion pipeline (the heart)
       jd_fetch.py         Fetch + clean job descriptions (anti-bot aware)
-      ai.py               Résumé-fit (Gemini, or offline heuristic)
-      semantic.py         Offline embedding-based résumé↔JD scoring
+      ai.py               Resume-fit (Gemini, or offline heuristic)
+      semantic.py         Offline embedding-based resume↔JD scoring
       preferences.py      User settings storage + "apply to board" matching
       geo.py / distance.py  Geocoding + distance filtering
-      resume_loader.py    Résumé text extraction
+      resume_loader.py    Resume text extraction
     agent/             The AI assistant (see AI-Agent.md)
       tools.py            Tool schemas + executors (read-only over the pipeline)
       providers.py        Per-provider streaming tool-use loops (Anthropic/Gemini/OpenAI)
@@ -147,7 +147,7 @@ flowchart TD
     F --> G["For each NEW job: score_and_persist()"]
     G --> H["Fetch JD (jd_fetch) if missing"]
     H --> I["Detect expiry -> move to Expired"]
-    I --> J["Semantic score (résumé vs JD)"]
+    I --> J["Semantic score (resume vs JD)"]
     J --> K["Advance watermark; backfill distances"]
 ```
 
@@ -180,16 +180,16 @@ Job boards actively fight server-side scraping, and **each one differently**.
 - **HTML → Markdown:** JSON-LD `JobPosting.description` (preferred) or known
   content selectors, converted to Markdown with correct **nested-list** handling.
 
-### 5.3 Résumé-fit analysis (`services/ai.py`, `gemini_client.py`)
+### 5.3 Resume-fit analysis (`services/ai.py`, `gemini_client.py`)
 
-`POST /api/ai/compare` builds `title/company + JD` vs résumé text and asks the
+`POST /api/ai/compare` builds `title/company + JD` vs resume text and asks the
 LLM for a match score plus a Markdown report. **Graceful degradation:** with no
 LLM key it returns a deterministic keyword-overlap heuristic, so the app is fully
 functional offline.
 
 ### 5.4 Offline semantic scoring (`services/semantic.py`)
 
-When `WITH_SEMANTIC=true`, sentence-transformers embeds the résumé and JD and
+When `WITH_SEMANTIC=true`, sentence-transformers embeds the resume and JD and
 scores cosine similarity — a no-LLM-cost match signal computed at ingest time.
 Kept behind a build flag so the base image stays small for the 2 GB NAS.
 

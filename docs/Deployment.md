@@ -129,14 +129,14 @@ workflow). The runner builds the images on the NAS and starts the stack.
 
 By default this builds the **slim backend** (no PyTorch) — fast to build and runs
 in well under 1 GB RAM, ideal for a 2 GB DS220+. The Gemini "Compare with Resume"
-feature works in slim mode; only the *offline* semantic résumé↔JD matching is
+feature works in slim mode; only the *offline* semantic resume↔JD matching is
 omitted. To enable it on a higher-RAM host, set a repo **Variable**
 `WITH_SEMANTIC=true` and re-deploy.
 
 ## 7. Step 4 — Use it
 
 Open `http://<NAS-IP>:8080`. Click **Fetch alerts** to ingest (needs the Gmail
-files in `secrets/`); the résumé comes from `/data/Resume.docx`.
+files in `secrets/`); the resume comes from `/data/Resume.docx`.
 
 ---
 

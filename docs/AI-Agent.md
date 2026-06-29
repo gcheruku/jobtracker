@@ -58,7 +58,7 @@ sequenceDiagram
     participant M as LLM provider
     participant T as tools.py
 
-    U->>FE: "Which saved jobs best fit my résumé?"
+    U->>FE: "Which saved jobs best fit my resume?"
     FE->>API: POST (message + history)
     API->>P: run(provider, messages)
     loop until done or 8 steps
@@ -111,7 +111,7 @@ Each tool is a JSON schema (sent to the model) plus an executor
 | `search_jobs` | Query the pipeline by text, status, score, source |
 | `get_job` | Fetch a single job's full detail |
 | `get_pipeline_stats` | Aggregate counts/metrics across the board |
-| `compare_resume_to_job` | Run the résumé-fit analysis for a job |
+| `compare_resume_to_job` | Run the resume-fit analysis for a job |
 
 **All tools are read-only in v1**, so no action is destructive and no
 human-in-the-loop approval gate is needed yet. The natural next layer is write
@@ -134,6 +134,6 @@ tools (set status / skip / add note) behind an approval queue — see
 
 The questions are open-ended and need live, per-user data — the model must
 *decide* which jobs to look at, read their details, and compare them against the
-résumé. That is tool use plus a loop, not a single call. The core is
+resume. That is tool use plus a loop, not a single call. The core is
 provider-agnostic (one neutral event contract); the provider-specific edges are
 three small adapters.

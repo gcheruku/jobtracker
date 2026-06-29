@@ -1,7 +1,7 @@
 # JobTrack
 
 > A self-hosted, AI-powered job-search tracker. It ingests job-alert emails from
-> Gmail, fetches and scores each posting against your résumé, and tracks it
+> Gmail, fetches and scores each posting against your resume, and tracks it
 > through a Kanban pipeline — with a provider-selectable, tool-using AI assistant
 > on top.
 
@@ -20,7 +20,7 @@ is reachable privately over Tailscale, and deploys itself via a self-hosted
 GitHub Actions runner on every push to `main`. It is built to be **fully
 functional with no API keys** (graceful degradation throughout) and to make the
 **production AI patterns** — agentic tool use, multi-LLM abstraction, RAG-style
-résumé grounding, semantic search, streaming, and guardrails — concrete and
+resume grounding, semantic search, streaming, and guardrails — concrete and
 inspectable.
 
 ---
@@ -31,7 +31,7 @@ inspectable.
 |---|---|
 | ![Kanban board](docs/screenshots/board.png) | ![AI assistant](docs/screenshots/assistant.png) |
 
-| Résumé compare | Settings |
+| Resume compare | Settings |
 |---|---|
 | ![Compare with Resume](docs/screenshots/ai-compare.png) | ![Settings](docs/screenshots/settings.png) |
 
@@ -48,10 +48,10 @@ inspectable.
   4h and via a manual **Fetch alerts** button; deduped by canonical posting id.
 - **Job-description fetching** that defeats per-site anti-bot walls (browser TLS
   impersonation, link rewriting, host-scoped cooldowns).
-- **Résumé-fit analysis** — an LLM match score + Markdown report, with a
+- **Resume-fit analysis** — an LLM match score + Markdown report, with a
   deterministic offline heuristic fallback when no key is present.
 - **Offline semantic matching** (sentence-transformers) — a no-LLM-cost
-  résumé↔JD signal computed at ingest time (optional build flag).
+  resume↔JD signal computed at ingest time (optional build flag).
 - **Provider-selectable AI assistant** — a tool-using agent over your pipeline,
   backed by Anthropic, Gemini, or OpenAI, streamed over SSE.
 - **Preferences** (salary / location+distance / min score / keywords) that move
@@ -144,8 +144,8 @@ experience with the patterns that now define applied AI engineering:
 - **Multi-LLM architecture** — one neutral event contract with three thin
   provider adapters (Anthropic / Gemini / OpenAI), selectable at runtime.
 - **RAG / grounding** — answers and scores are grounded in the user's actual
-  résumé and the fetched job descriptions, not the model's priors.
-- **Semantic search** — embedding-based résumé↔JD similarity as a no-LLM-cost
+  resume and the fetched job descriptions, not the model's priors.
+- **Semantic search** — embedding-based resume↔JD similarity as a no-LLM-cost
   match signal.
 - **AI guardrails** — read-only tools, a step cap, token tracing, and graceful
   "no key" degradation.
@@ -191,7 +191,7 @@ prompts/    The prompts used to build the app, kept for provenance
 
 ## Privacy & data
 
-No personal data is in this repository. Your résumé, Gmail credentials, `.env`,
+No personal data is in this repository. Your resume, Gmail credentials, `.env`,
 and the SQLite database are gitignored; template/sample files are provided so you
 can supply your own. See [SECURITY.md](SECURITY.md).
 

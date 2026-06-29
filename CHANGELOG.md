@@ -26,7 +26,7 @@ to follow [Semantic Versioning](https://semver.org/).
 ## [0.4.0] — Semantic scoring by default
 
 ### Added
-- Semantic résumé↔JD matching by default via Gemini embeddings (no Torch
+- Semantic resume↔JD matching by default via Gemini embeddings (no Torch
   required), with sorting and a Saved-only backfill.
 
 ## [0.3.0] — Provider-selectable AI assistant
@@ -56,7 +56,7 @@ to follow [Semantic Versioning](https://semver.org/).
 ### Added
 - FastAPI + SQLite backend; Vite + React + Tailwind frontend.
 - Gmail job-alert ingestion (Dice/LinkedIn/Glassdoor/Indeed), dedup, JD fetch.
-- Kanban board, preferences, résumé-fit "Compare with Resume" analysis.
+- Kanban board, preferences, resume-fit "Compare with Resume" analysis.
 - Self-hosted Synology deployment via a GitHub Actions runner.
 
 [Unreleased]: https://github.com/gcheruku/jobtracker/commits/main

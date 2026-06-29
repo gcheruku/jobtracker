@@ -28,7 +28,7 @@ to grow.
 
 - **More sources.** Additional job boards and ATS integrations behind the same
   deterministic-first ingestion contract.
-- **Retrieval upgrades.** A vector store for résumé/JD chunks to sharpen semantic
+- **Retrieval upgrades.** A vector store for resume/JD chunks to sharpen semantic
   matching and ground the assistant's answers.
 - **Cost dashboards.** Aggregate the per-turn token traces into spend reporting.
 

@@ -18,7 +18,7 @@ no API keys (reduced features), so you can get a UI up quickly.
 - **Preserve graceful degradation.** A missing key disables a feature with a
   clear message — it must never crash a request path.
 - **No secrets, ever.** Never commit `.env`, `jobs.db`, OAuth tokens, or a real
-  résumé. See [SECURITY.md](SECURITY.md) and the `.gitignore`.
+  resume. See [SECURITY.md](SECURITY.md) and the `.gitignore`.
 
 ## Workflow
 

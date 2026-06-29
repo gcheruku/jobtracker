@@ -78,12 +78,12 @@ the app runs without any of it, with reduced features.
 |---|---|---|
 | `GOOGLE_API_KEY` | — | Enables Gemini AI compare + ingestion extraction/scoring |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model id |
-| `ANTHROPIC_API_KEY` | — | Enables the Claude agent / résumé analysis |
+| `ANTHROPIC_API_KEY` | — | Enables the Claude agent / resume analysis |
 | `ANTHROPIC_MODEL` | `claude-opus-4-8` | Claude model id |
 | `OPENAI_API_KEY` | — | Enables OpenAI as an agent provider |
 | `OPENAI_MODEL` | `gpt-4o` | OpenAI model id |
 | `AGENT_PROVIDER` | `anthropic` | Default agent provider when unset in Settings |
-| `RESUME_DOCX_PATH` | `../Resume.docx` | Résumé `.docx` used for match scoring (supply your own) |
+| `RESUME_DOCX_PATH` | `../Resume.docx` | Resume `.docx` used for match scoring (supply your own) |
 | `JOBTRACKER_DATABASE_URL` | `sqlite:///jobs.db` | DB URL (point at Postgres if desired) |
 | `JOBTRACKER_CORS_ORIGINS` | localhost dev origins | Comma-separated origins, or `*` to open |
 | `GMAIL_LABEL` | `Job alerts` | Gmail label that holds the alert emails |
