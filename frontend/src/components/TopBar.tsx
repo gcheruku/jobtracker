@@ -69,6 +69,21 @@ export function TopBar({
           )}
         </div>
 
+        {/* How the search query is matched. "Exact phrase" matches whole words
+            contiguously, so "software engineer" excludes "...Engineering Manager". */}
+        <select
+          value={filters.match ?? "all"}
+          onChange={(e) =>
+            setFilters({ ...filters, match: e.target.value as JobFilters["match"] })
+          }
+          title="How search matches your query"
+          className="shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-600 outline-none focus:border-indigo-400"
+        >
+          <option value="all">All words</option>
+          <option value="any">Any word</option>
+          <option value="phrase">Exact phrase</option>
+        </select>
+
         {board && (
           <>
             <SortMenu value={board.sort} onChange={board.setSort} />

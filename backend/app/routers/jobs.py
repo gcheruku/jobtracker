@@ -3,11 +3,12 @@ plus per-job notes and checklist items."""
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
 from ..config import (
@@ -72,10 +73,24 @@ def _to_out(job: Job) -> JobOut:
     )
 
 
+def _phrase_pattern(q: str) -> Optional[re.Pattern[str]]:
+    """Compile a whole-word, contiguous-phrase matcher for the "phrase" search
+    mode. 'software engineer' matches 'Senior Software Engineer' but NOT
+    'Software Engineering Manager' (the trailing \\b stops 'engineer' from
+    matching inside 'engineering'). Tolerates irregular spacing between words."""
+    tokens = [re.escape(t) for t in q.lower().split()]
+    if not tokens:
+        return None
+    return re.compile(r"\b" + r"\s+".join(tokens) + r"\b")
+
+
 @router.get("", response_model=List[JobOut])
 def list_jobs(
     session: Session = Depends(get_session),
     q: Optional[str] = Query(None, description="search title/company/location"),
+    match: str = Query(
+        "all", description="search mode: 'all' words, 'any' word, or exact 'phrase'"
+    ),
     status: Optional[str] = Query(None, description="filter by display status"),
     work_mode: Optional[str] = None,
     min_salary: Optional[int] = Query(None, description="parse salary, keep >= this"),
@@ -101,20 +116,39 @@ def list_jobs(
     if work_mode:
         stmt = stmt.where(Job.work_mode == work_mode)
 
-    if q:
-        # Each word must appear in SOME column (title/company/location); words
-        # need not be contiguous or in the same column. e.g. "senior citi" ->
-        # "senior" in title AND "citi" in company.
-        for token in q.lower().split():
-            like = f"%{token}%"
-            stmt = stmt.where(
-                func.lower(Job.title).like(like)
-                | func.lower(Job.company).like(like)
-                | func.lower(Job.location).like(like)
-            )
+    if q and match != "phrase":
+        tokens = q.lower().split()
+        # A word matches if it's a substring of SOME column (title/company/
+        # location); words need not be contiguous or in the same column.
+        per_word = [
+            func.lower(Job.title).like(f"%{t}%")
+            | func.lower(Job.company).like(f"%{t}%")
+            | func.lower(Job.location).like(f"%{t}%")
+            for t in tokens
+        ]
+        if match == "any":
+            # "any": at least one word matches. e.g. "remote staff" -> either.
+            if per_word:
+                stmt = stmt.where(or_(*per_word))
+        else:
+            # "all" (default): every word must match somewhere.
+            for clause in per_word:
+                stmt = stmt.where(clause)
 
     jobs = session.exec(stmt).all()
     out = [_to_out(j) for j in jobs]
+
+    # "phrase": exact, whole-word contiguous match, refined in Python so
+    # "software engineer" excludes "Software Engineering Manager".
+    if q and match == "phrase":
+        pat = _phrase_pattern(q)
+        if pat is not None:
+            out = [
+                j for j in out
+                if pat.search((j.title or "").lower())
+                or pat.search((j.company or "").lower())
+                or pat.search((j.location or "").lower())
+            ]
 
     # Mismatched view: preference-mismatched jobs only.
     if only_mismatched:
@@ -158,7 +192,6 @@ def _salary_floor(salary: Optional[str]) -> int:
     """Best-effort lowest number found in a salary string, scaled to yearly-ish."""
     if not salary:
         return 0
-    import re
     nums = [int(n.replace(",", "")) for n in re.findall(r"[\d,]{2,}", salary)]
     return min(nums) if nums else 0
 

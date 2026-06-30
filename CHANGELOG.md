@@ -7,6 +7,9 @@ to follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Search match modes (All words / Any word / Exact phrase) via a selector next to
+  the search box; "Exact phrase" matches whole words contiguously, so "software
+  engineer" no longer returns "Software Engineering Manager".
 - Public-portfolio documentation set: `docs/Architecture.md`, `docs/AI-Agent.md`,
   `docs/Deployment.md`, `docs/Development.md`, plus Mermaid diagrams.
 - GitHub project files: `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`,

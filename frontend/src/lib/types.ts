@@ -161,6 +161,8 @@ export interface IngestStatus {
 
 export interface JobFilters {
   q?: string;
+  // How `q` is matched: every word (default), any word, or exact whole-word phrase.
+  match?: "all" | "any" | "phrase";
   status?: string;
   work_mode?: string;
   min_salary?: number;

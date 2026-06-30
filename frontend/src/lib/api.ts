@@ -37,6 +37,7 @@ export const api = {
   listJobs(filters: JobFilters = {}): Promise<Job[]> {
     const p = new URLSearchParams();
     if (filters.q) p.set("q", filters.q);
+    if (filters.q && filters.match) p.set("match", filters.match);
     if (filters.status) p.set("status", filters.status);
     if (filters.work_mode) p.set("work_mode", filters.work_mode);
     if (filters.min_salary) p.set("min_salary", String(filters.min_salary));
