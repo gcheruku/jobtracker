@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, Eye, EyeOff, MapPin, Search } from "lucide-react";
+import { Check, ExternalLink, Eye, EyeOff, MapPin, Minus, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
@@ -19,6 +19,7 @@ export function SearchResults({
   onOpen,
   onToggleSelect,
   onRangeSelect,
+  onClearSelection,
   anchorKey,
   selectedKeys,
 }: {
@@ -28,6 +29,7 @@ export function SearchResults({
   // status/skip action bar (rendered in App) operates on search results too.
   onToggleSelect: (j: Job) => void;
   onRangeSelect: (keys: string[]) => void;
+  onClearSelection: () => void;
   anchorKey: string | null;
   selectedKeys: Set<string>;
 }) {
@@ -69,6 +71,13 @@ export function SearchResults({
   const jobs = results.data ?? [];
   const selectionMode = selectedKeys.size > 0;
 
+  // Select-all state across the current result set.
+  const selectedCount = jobs.reduce((n, j) => n + (selectedKeys.has(j.job_key) ? 1 : 0), 0);
+  const allSelected = jobs.length > 0 && selectedCount === jobs.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+  const toggleSelectAll = () =>
+    allSelected ? onClearSelection() : onRangeSelect(jobs.map((j) => j.job_key));
+
   // Shift+click selects the contiguous range from the anchor to this card,
   // within the flat results order. Falls back to a single toggle otherwise.
   const handleSelect = (job: Job, shiftKey: boolean) => {
@@ -87,7 +96,7 @@ export function SearchResults({
 
   return (
     <div className="p-6">
-      <div className="mb-4 flex items-center gap-2 text-slate-600">
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-slate-600">
         <Search size={18} className="text-indigo-600" />
         <h2 className="text-base font-semibold">
           {results.isLoading ? "Searching…" : `${jobs.length} result${jobs.length === 1 ? "" : "s"}`}
@@ -96,6 +105,28 @@ export function SearchResults({
         <span className="ml-2 text-xs text-slate-400">
           on the board · search the Inactive tab for skipped/expired
         </span>
+        {!results.isLoading && jobs.length > 0 && (
+          <button
+            onClick={toggleSelectAll}
+            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            <span
+              className={`grid h-4 w-4 place-items-center rounded border ${
+                allSelected
+                  ? "border-indigo-600 bg-indigo-600 text-white"
+                  : someSelected
+                    ? "border-indigo-400 bg-indigo-100 text-indigo-600"
+                    : "border-slate-300"
+              }`}
+            >
+              {allSelected ? <Check size={12} /> : someSelected ? <Minus size={12} /> : null}
+            </span>
+            {allSelected ? "Deselect all" : "Select all"}
+            {selectedCount > 0 && (
+              <span className="text-xs font-normal text-slate-400">({selectedCount})</span>
+            )}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

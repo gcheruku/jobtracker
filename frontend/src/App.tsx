@@ -211,6 +211,7 @@ export default function App() {
               onOpen={setSelected}
               onToggleSelect={toggleSelect}
               onRangeSelect={selectRange}
+              onClearSelection={clearSelection}
               anchorKey={anchorKey}
               selectedKeys={selectedKeys}
             />
