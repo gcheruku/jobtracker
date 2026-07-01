@@ -127,18 +127,17 @@ export default function App() {
   // Bulk actions over the multi-selected board cards (no delete here — that
   // only applies to already-skipped/mismatched jobs in the Inactive view).
   const bulkMove = useMutation({
-    mutationFn: async (status: PipelineStatus) => {
-      await Promise.all([...selectedKeys].map((k) => api.moveStatus(k, status)));
-    },
+    // Single request + one DB transaction — reliable for large selections
+    // (firing one request per job caused partial failures at scale).
+    mutationFn: (status: PipelineStatus) =>
+      api.bulkSetStatus([...selectedKeys], status),
     onSuccess: () => {
       refresh();
       clearSelection();
     },
   });
   const bulkSkip = useMutation({
-    mutationFn: async () => {
-      await Promise.all([...selectedKeys].map((k) => api.ignoreJob(k)));
-    },
+    mutationFn: () => api.bulkIgnore([...selectedKeys]),
     onSuccess: () => {
       refresh();
       clearSelection();

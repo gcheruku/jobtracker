@@ -79,6 +79,18 @@ export const api = {
   deleteJob(k: string): Promise<void> {
     return http<void>(`/api/jobs/${key(k)}`, { method: "DELETE" });
   },
+  bulkIgnore(keys: string[]): Promise<{ ignored: number }> {
+    return http(`/api/jobs/bulk-ignore`, {
+      method: "POST",
+      body: JSON.stringify({ job_keys: keys }),
+    });
+  },
+  bulkSetStatus(keys: string[], status: string): Promise<{ updated: number }> {
+    return http(`/api/jobs/bulk-status`, {
+      method: "POST",
+      body: JSON.stringify({ job_keys: keys, status }),
+    });
+  },
   bulkRestore(keys: string[]): Promise<{ restored: number }> {
     return http(`/api/jobs/bulk-restore`, {
       method: "POST",
