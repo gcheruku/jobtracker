@@ -20,8 +20,11 @@ def stats(session: Session = Depends(get_session)):
     by_status = {s: 0 for s in PIPELINE_STATUSES}
     ignored = 0
     mismatched = 0
+    watchlist = 0
     visible = 0
     for j in jobs:
+        if j.watchlist and not j.ignored:
+            watchlist += 1  # counted independently of pipeline status
         if j.ignored:
             ignored += 1
             continue
@@ -36,6 +39,7 @@ def stats(session: Session = Depends(get_session)):
         visible=visible,
         ignored=ignored,
         mismatched=mismatched,
+        watchlist=watchlist,
         by_status=by_status,
     )
 

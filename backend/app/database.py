@@ -64,6 +64,8 @@ def init_db() -> None:
         _add_column_if_missing(conn, "jobs", "semantic_score", "REAL")
         _add_column_if_missing(conn, "jobs", "semantic_at", "TEXT")
         _add_column_if_missing(conn, "jobs", "semantic_attempted_at", "TEXT")
+        _add_column_if_missing(conn, "jobs", "watchlist", "INTEGER DEFAULT 0")
+        conn.execute(text("UPDATE jobs SET watchlist = 0 WHERE watchlist IS NULL"))
         # Normalize any NULL ignored values left by older rows.
         conn.execute(text("UPDATE jobs SET ignored = 0 WHERE ignored IS NULL"))
 

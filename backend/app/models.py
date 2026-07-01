@@ -60,6 +60,9 @@ class Job(SQLModel, table=True):
     # Off-board because it doesn't match the user's saved preferences.
     mismatched: Optional[bool] = Field(default=False)
     mismatch_reason: Optional[str] = None  # why it was mismatched (for the view)
+    # Starred to revisit later (e.g. blocked on securing a referral). Orthogonal
+    # to pipeline status: a job stays where it is and just carries this marker.
+    watchlist: Optional[bool] = Field(default=False)
     # Offline sentence-transformers resume<->JD similarity (0-100).
     semantic_score: Optional[float] = None
     semantic_at: Optional[str] = None

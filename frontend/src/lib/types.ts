@@ -50,6 +50,7 @@ export interface Job {
   ignored: boolean;
   mismatched: boolean;
   mismatch_reason: string | null;
+  watchlist: boolean;
 }
 
 export interface Stats {
@@ -57,6 +58,7 @@ export interface Stats {
   visible: number;
   ignored: number;
   mismatched: number;
+  watchlist: number;
   by_status: Record<string, number>;
 }
 
@@ -174,6 +176,7 @@ export interface JobFilters {
   board_only?: boolean;
   off_board?: boolean;
   only_mismatched?: boolean;
+  watchlist?: boolean;
 }
 
 // Client-side dashboard filters set via the Filters popup. Each field carries
