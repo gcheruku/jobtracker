@@ -26,6 +26,10 @@ type RunOpts = { since_epoch?: number; fetch_all?: boolean } | undefined;
 export function FetchAlertsButton() {
   const qc = useQueryClient();
   const [polling, setPolling] = useState(false);
+  // Guard against ending a run before we've actually observed it running: the
+  // backend uses BackgroundTasks, so a stale status poll can briefly report
+  // running:false right after we trigger.
+  const [sawRunning, setSawRunning] = useState(false);
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [panel, setPanel] = useState<Panel>("menu");
@@ -42,10 +46,14 @@ export function FetchAlertsButton() {
 
   const start = useMutation({
     mutationFn: (opts: RunOpts) => api.ingestRun(opts),
-    onSuccess: (r) => {
-      if (r.started === false) setFlash({ kind: "err", text: r.detail ?? "Already running" });
-      else setFlash(null);
+    onSuccess: () => {
+      // Whether we started it or it was already running (scheduler), track it.
+      setFlash(null);
+      setSawRunning(false);
       setPolling(true);
+      // Fetch fresh status immediately rather than waiting for the 2s interval,
+      // so the button/toast reflect the run right away.
+      qc.invalidateQueries({ queryKey: ["ingest-status"] });
     },
     // Without this, a failed request (backend down, proxy 5xx, network) would
     // leave the button doing nothing at all — no spinner, no toast.
@@ -61,19 +69,25 @@ export function FetchAlertsButton() {
 
   // When a run we were polling finishes, refresh data and show a summary.
   useEffect(() => {
-    if (polling && statusQ.data && !statusQ.data.running) {
-      setPolling(false);
-      const s = statusQ.data.last_summary;
-      setToastHidden(false); // surface the result even if the spinner was hidden
-      if (statusQ.data.last_error)
-        setFlash({ kind: "err", text: `Error: ${statusQ.data.last_error}` });
-      else if (s)
-        setFlash({ kind: "ok", text: `+${s.new_jobs} new · ${s.duplicates} duplicates` });
-      qc.invalidateQueries({ queryKey: ["jobs"] });
-      qc.invalidateQueries({ queryKey: ["stats"] });
-      qc.invalidateQueries({ queryKey: ["activity"] });
+    if (!polling || !statusQ.data) return;
+    if (statusQ.data.running) {
+      if (!sawRunning) setSawRunning(true);
+      return;
     }
-  }, [polling, statusQ.data, qc]);
+    // running is false — only treat this as "done" once we've actually seen the
+    // run in progress, so a stale poll right after triggering doesn't end it.
+    if (!sawRunning) return;
+    setPolling(false);
+    const s = statusQ.data.last_summary;
+    setToastHidden(false); // surface the result even if the spinner was hidden
+    if (statusQ.data.last_error)
+      setFlash({ kind: "err", text: `Error: ${statusQ.data.last_error}` });
+    else if (s)
+      setFlash({ kind: "ok", text: `+${s.new_jobs} new · ${s.duplicates} duplicates` });
+    qc.invalidateQueries({ queryKey: ["jobs"] });
+    qc.invalidateQueries({ queryKey: ["stats"] });
+    qc.invalidateQueries({ queryKey: ["activity"] });
+  }, [polling, statusQ.data, sawRunning, qc]);
 
   // Auto-dismiss the result toast (but never the in-progress one).
   useEffect(() => {
@@ -229,7 +243,9 @@ export function FetchAlertsButton() {
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold">Fetching alerts…</div>
                 <div className="text-xs text-slate-500">
-                  This can take a few minutes. You can keep working.
+                  {statusQ.data?.scored_so_far
+                    ? `Scored ${statusQ.data.scored_so_far} new job${statusQ.data.scored_so_far === 1 ? "" : "s"} so far… you can keep working.`
+                    : "This can take a few minutes. You can keep working."}
                 </div>
               </div>
               <button

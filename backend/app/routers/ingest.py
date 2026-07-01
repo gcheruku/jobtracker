@@ -47,6 +47,13 @@ def trigger_ingest(
     if status.get("running"):
         return {"started": False, "detail": "An ingest is already running."}
 
+    # Mark running synchronously — BackgroundTasks execute AFTER the response is
+    # sent, so without this there's a window where status.running is still False
+    # and the UI's first poll concludes the run already finished.
+    status["running"] = True
+    status["phase"] = "starting"
+    status["scored_so_far"] = 0
+
     if fetch_all:
         background_tasks.add_task(
             run_ingest, max_messages=INGEST_MAX_MESSAGES_ALL, since_epoch=0
