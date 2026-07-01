@@ -22,6 +22,7 @@ from ..models import ChecklistItem, Job, Note
 from ..services.jd_fetch import fetch_job_description
 from ..schemas import (
     BulkKeys,
+    BulkStatus,
     ChecklistItemIn,
     ChecklistItemOut,
     ChecklistItemUpdate,
@@ -337,6 +338,42 @@ def bulk_restore(payload: BulkKeys, session: Session = Depends(get_session)) -> 
         restored += 1
     session.commit()
     return {"restored": restored}
+
+
+@router.post("/bulk-ignore")
+def bulk_ignore(payload: BulkKeys, session: Session = Depends(get_session)) -> dict:
+    """Skip (ignore) many jobs in a single transaction. Doing this in one request
+    avoids the SQLite write contention and partial failures that firing one
+    request per job caused for large selections."""
+    ignored = 0
+    for key in payload.job_keys:
+        job = session.get(Job, key)
+        if not job:
+            continue
+        if not job.ignored:
+            job.ignored = True
+            session.add(job)
+        ignored += 1
+    session.commit()
+    return {"ignored": ignored}
+
+
+@router.post("/bulk-status")
+def bulk_status(payload: BulkStatus, session: Session = Depends(get_session)) -> dict:
+    """Move many jobs to a pipeline status in a single transaction."""
+    if payload.status not in PIPELINE_STATUSES:
+        raise HTTPException(400, f"status must be one of {PIPELINE_STATUSES}")
+    updated = 0
+    for key in payload.job_keys:
+        job = session.get(Job, key)
+        if not job:
+            continue
+        job.status = payload.status
+        job.status_updated_at = _now()
+        session.add(job)
+        updated += 1
+    session.commit()
+    return {"updated": updated}
 
 
 @router.post("/bulk-delete")

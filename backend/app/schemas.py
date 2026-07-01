@@ -39,6 +39,11 @@ class BulkKeys(BaseModel):
     job_keys: List[str]
 
 
+class BulkStatus(BaseModel):
+    job_keys: List[str]
+    status: str
+
+
 class JobOut(BaseModel):
     job_key: str
     title: Optional[str]
