@@ -1,17 +1,12 @@
 name: jobtracker
 
-# Build contexts are relative to this file (deploy/), so ../backend and ../frontend.
+# Images are prebuilt on GitHub-hosted runners and pushed to GHCR; the NAS only
+# pulls them (no on-device build). See .github/workflows/deploy.yml.
 # DATA_DIR is the NAS folder holding all personal data (jobs.db, secrets/,
 # Resume.docx, .env, hf-cache) — it lives OUTSIDE the repo and is never committed.
 services:
   backend:
-    build:
-      context: ../backend
-      args:
-        # SLIM by default (no PyTorch) — friendly to low-RAM NAS hardware.
-        # Set WITH_SEMANTIC=true to also install sentence-transformers/Torch.
-        WITH_SEMANTIC: ${WITH_SEMANTIC:-false}
-    image: jobtracker-backend:latest
+    image: ghcr.io/gcheruku/jobtracker-backend:latest
     container_name: jobtracker-backend
     restart: unless-stopped
     volumes:
@@ -26,9 +21,7 @@ services:
       start_period: 60s
 
   frontend:
-    build:
-      context: ../frontend
-    image: jobtracker-frontend:latest
+    image: ghcr.io/gcheruku/jobtracker-frontend:latest
     container_name: jobtracker-frontend
     restart: unless-stopped
     depends_on:
