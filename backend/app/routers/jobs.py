@@ -23,6 +23,7 @@ from ..services.jd_fetch import fetch_job_description
 from ..schemas import (
     BulkKeys,
     BulkStatus,
+    BulkWatchlist,
     ChecklistItemIn,
     ChecklistItemOut,
     ChecklistItemUpdate,
@@ -32,6 +33,7 @@ from ..schemas import (
     NoteIn,
     NoteOut,
     StatusMove,
+    WatchlistToggle,
 )
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -71,6 +73,7 @@ def _to_out(job: Job) -> JobOut:
         ignored=bool(job.ignored),
         mismatched=bool(job.mismatched),
         mismatch_reason=job.mismatch_reason,
+        watchlist=bool(job.watchlist),
     )
 
 
@@ -102,6 +105,7 @@ def list_jobs(
         False, description="only off-board jobs: ignored OR Rejected/Expired"
     ),
     only_mismatched: bool = Query(False, description="only preference-mismatched jobs"),
+    watchlist: bool = Query(False, description="only watchlisted (starred) jobs"),
     sort: str = Query("recent", description="recent | match | semantic | company | title"),
 ):
     stmt = select(Job)
@@ -174,6 +178,9 @@ def list_jobs(
 
     if min_salary:
         out = [j for j in out if _salary_floor(j.salary) >= min_salary]
+
+    if watchlist:
+        out = [j for j in out if j.watchlist]
 
     reverse = True
     if sort == "match":
@@ -273,6 +280,36 @@ def ignore_job(job_key: str, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(job)
     return _to_out(job)
+
+
+@router.post("/{job_key}/watchlist", response_model=JobOut)
+def set_watchlist(
+    job_key: str, payload: WatchlistToggle, session: Session = Depends(get_session)
+):
+    """Star/unstar a job for later revisit (orthogonal to pipeline status)."""
+    job = session.get(Job, job_key)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job.watchlist = payload.on
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    return _to_out(job)
+
+
+@router.post("/bulk-watchlist")
+def bulk_watchlist(payload: BulkWatchlist, session: Session = Depends(get_session)) -> dict:
+    """Star/unstar many jobs in one transaction."""
+    updated = 0
+    for key in payload.job_keys:
+        job = session.get(Job, key)
+        if not job:
+            continue
+        job.watchlist = payload.on
+        session.add(job)
+        updated += 1
+    session.commit()
+    return {"updated": updated, "on": payload.on}
 
 
 @router.post("/{job_key}/refresh-description", response_model=JobOut)

@@ -6,13 +6,15 @@ import {
   FileText,
   Settings,
   SlidersHorizontal,
+  Star,
   X,
 } from "lucide-react";
 
-export type View = "dashboard" | "mismatched" | "inactive" | "settings";
+export type View = "dashboard" | "watchlist" | "mismatched" | "inactive" | "settings";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "watchlist", label: "Watchlist", icon: Star },
   { id: "mismatched", label: "Mismatched", icon: SlidersHorizontal },
   { id: "inactive", label: "Inactive", icon: Archive },
   { id: "settings", label: "Settings", icon: Settings },

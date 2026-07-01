@@ -12,6 +12,11 @@ import os
 import tempfile
 
 _tmp_db = os.path.join(tempfile.gettempdir(), "jobtracker_test.db")
+# Start each test session from a clean DB so the schema always matches the
+# current models (create_all never ALTERs an existing table, so a stale file
+# would be missing newly-added columns).
+if os.path.exists(_tmp_db):
+    os.remove(_tmp_db)
 os.environ.setdefault("JOBTRACKER_DATABASE_URL", f"sqlite:///{_tmp_db}")
 # Keep tests hermetic: no real keys, deterministic provider default.
 os.environ.setdefault("ANTHROPIC_API_KEY", "")

@@ -12,6 +12,7 @@ import {
   EyeOff,
   RefreshCw,
   Loader2,
+  Star,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { PIPELINE, type Job, type PipelineStatus } from "../lib/types";
@@ -106,6 +107,10 @@ export function JobDetail({
     mutationFn: () => api.refreshDescription(job.job_key),
     onSuccess: onChanged,
   });
+  const toggleWatchlist = useMutation({
+    mutationFn: () => api.setWatchlist(job.job_key, !job.watchlist),
+    onSuccess: onChanged,
+  });
   const ignore = useMutation({
     mutationFn: () => api.ignoreJob(job.job_key),
     onSuccess: () => {
@@ -136,11 +141,26 @@ export function JobDetail({
             <SourceTag source={job.source} />
           </div>
         </div>
-        {onClose && showClose && (
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
-            <X size={20} />
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => toggleWatchlist.mutate()}
+            title={job.watchlist ? "Remove from watchlist" : "Save to watchlist (revisit later)"}
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100"
+          >
+            <Star
+              size={20}
+              className={job.watchlist ? "fill-amber-400 text-amber-500" : "hover:text-amber-500"}
+            />
           </button>
-        )}
+          {onClose && showClose && (
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Primary actions */}

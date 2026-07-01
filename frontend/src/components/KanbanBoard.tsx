@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Check, ChevronDown, ExternalLink, EyeOff, MapPin } from "lucide-react";
+import { Check, ChevronDown, ExternalLink, EyeOff, MapPin, Star } from "lucide-react";
 import { BOARD_STATUSES, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
@@ -21,6 +21,7 @@ function JobCard({
   job,
   onOpen,
   onIgnore,
+  onToggleWatchlist,
   onSelect,
   selected = false,
   selectionMode = false,
@@ -29,6 +30,7 @@ function JobCard({
   job: Job;
   onOpen: (j: Job) => void;
   onIgnore: (j: Job) => void;
+  onToggleWatchlist?: (j: Job) => void;
   onSelect?: (j: Job, shiftKey: boolean) => void;
   selected?: boolean;
   selectionMode?: boolean;
@@ -78,6 +80,30 @@ function JobCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          {onToggleWatchlist && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleWatchlist(job);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              title={job.watchlist ? "Remove from watchlist" : "Save to watchlist"}
+              // A starred card keeps the star visible (it's a badge); otherwise
+              // it reveals on hover like the other card actions.
+              className={`transition ${
+                job.watchlist ? "opacity-100" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
+              }`}
+            >
+              <Star
+                size={15}
+                className={
+                  job.watchlist
+                    ? "fill-amber-400 text-amber-500"
+                    : "text-slate-400 hover:text-amber-500"
+                }
+              />
+            </button>
+          )}
           {job.url && (
             <a
               href={job.url}
@@ -128,6 +154,7 @@ function Column({
   jobs,
   onOpen,
   onIgnore,
+  onToggleWatchlist,
   onToggleSelect,
   onRangeSelect,
   anchorKey,
@@ -140,6 +167,7 @@ function Column({
   jobs: Job[];
   onOpen: (j: Job) => void;
   onIgnore: (j: Job) => void;
+  onToggleWatchlist?: (j: Job) => void;
   onToggleSelect: (j: Job) => void;
   onRangeSelect: (keys: string[]) => void;
   anchorKey: string | null;
@@ -199,6 +227,7 @@ function Column({
             job={job}
             onOpen={onOpen}
             onIgnore={onIgnore}
+            onToggleWatchlist={onToggleWatchlist}
             onSelect={handleSelect}
             selected={selectedKeys.has(job.job_key)}
             selectionMode={selectedKeys.size > 0}
@@ -213,6 +242,7 @@ export function KanbanBoard({
   jobs,
   onOpen,
   onIgnore,
+  onToggleWatchlist,
   onMove,
   onToggleSelect,
   onRangeSelect,
@@ -222,6 +252,7 @@ export function KanbanBoard({
   jobs: Job[];
   onOpen: (j: Job) => void;
   onIgnore: (j: Job) => void;
+  onToggleWatchlist?: (j: Job) => void;
   onMove: (jobKey: string, status: PipelineStatus) => void;
   onToggleSelect: (j: Job) => void;
   onRangeSelect: (keys: string[]) => void;
@@ -294,6 +325,7 @@ export function KanbanBoard({
           jobs={byStatus[mobileStatus]}
           onOpen={onOpen}
           onIgnore={onIgnore}
+          onToggleWatchlist={onToggleWatchlist}
           onToggleSelect={onToggleSelect}
           onRangeSelect={onRangeSelect}
           anchorKey={anchorKey}
@@ -313,6 +345,7 @@ export function KanbanBoard({
             jobs={byStatus[status]}
             onOpen={onOpen}
             onIgnore={onIgnore}
+            onToggleWatchlist={onToggleWatchlist}
             onToggleSelect={onToggleSelect}
             onRangeSelect={onRangeSelect}
             anchorKey={anchorKey}

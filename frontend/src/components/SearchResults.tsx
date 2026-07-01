@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, Eye, EyeOff, MapPin, Minus, Search } from "lucide-react";
+import { Check, ExternalLink, Eye, EyeOff, MapPin, Minus, Search, Star } from "lucide-react";
 import { api } from "../lib/api";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
@@ -20,6 +20,7 @@ export function SearchResults({
   onToggleSelect,
   onRangeSelect,
   onClearSelection,
+  onToggleWatchlist,
   anchorKey,
   selectedKeys,
 }: {
@@ -30,6 +31,7 @@ export function SearchResults({
   onToggleSelect: (j: Job) => void;
   onRangeSelect: (keys: string[]) => void;
   onClearSelection: () => void;
+  onToggleWatchlist: (j: Job) => void;
   anchorKey: string | null;
   selectedKeys: Set<string>;
 }) {
@@ -168,6 +170,25 @@ export function SearchResults({
                     {job.company || "Unknown company"}
                   </div>
                 </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleWatchlist(job);
+                  }}
+                  title={job.watchlist ? "Remove from watchlist" : "Save to watchlist"}
+                  className={`transition ${
+                    job.watchlist ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  }`}
+                >
+                  <Star
+                    size={15}
+                    className={
+                      job.watchlist
+                        ? "fill-amber-400 text-amber-500"
+                        : "text-slate-400 hover:text-amber-500"
+                    }
+                  />
+                </button>
                 {job.url && (
                   <a
                     href={job.url}

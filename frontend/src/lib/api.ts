@@ -47,6 +47,7 @@ export const api = {
     if (filters.board_only) p.set("board_only", "true");
     if (filters.off_board) p.set("off_board", "true");
     if (filters.only_mismatched) p.set("only_mismatched", "true");
+    if (filters.watchlist) p.set("watchlist", "true");
     return http<Job[]>(`/api/jobs?${p.toString()}`);
   },
   getJob(k: string): Promise<Job> {
@@ -72,6 +73,18 @@ export const api = {
   },
   restoreJob(k: string): Promise<Job> {
     return http<Job>(`/api/jobs/${key(k)}/restore`, { method: "POST" });
+  },
+  setWatchlist(k: string, on: boolean): Promise<Job> {
+    return http<Job>(`/api/jobs/${key(k)}/watchlist`, {
+      method: "POST",
+      body: JSON.stringify({ on }),
+    });
+  },
+  bulkWatchlist(keys: string[], on: boolean): Promise<{ updated: number; on: boolean }> {
+    return http(`/api/jobs/bulk-watchlist`, {
+      method: "POST",
+      body: JSON.stringify({ job_keys: keys, on }),
+    });
   },
   refreshDescription(k: string): Promise<Job> {
     return http<Job>(`/api/jobs/${key(k)}/refresh-description`, { method: "POST" });

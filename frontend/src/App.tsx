@@ -16,6 +16,7 @@ import { ActivityLog } from "./components/ActivityLog";
 import { AgentChat } from "./components/AgentChat";
 import { InactiveView } from "./components/InactiveView";
 import { MismatchedView } from "./components/MismatchedView";
+import { WatchlistView } from "./components/WatchlistView";
 import { SearchResults } from "./components/SearchResults";
 import { SettingsView } from "./components/SettingsView";
 import { api } from "./lib/api";
@@ -124,6 +125,24 @@ export default function App() {
     onSuccess: refresh,
   });
 
+  // Star/unstar a job for later revisit. Optimistic so the board star flips
+  // instantly; the Watchlist view and counts reconcile on settle.
+  const watchlist = useMutation({
+    mutationFn: (v: { key: string; on: boolean }) => api.setWatchlist(v.key, v.on),
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: ["jobs", "board", filters] });
+      const prev = qc.getQueryData<Job[]>(["jobs", "board", filters]);
+      qc.setQueryData<Job[]>(["jobs", "board", filters], (old) =>
+        old?.map((j) => (j.job_key === v.key ? { ...j, watchlist: v.on } : j))
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["jobs", "board", filters], ctx.prev);
+    },
+    onSettled: refresh,
+  });
+
   // Bulk actions over the multi-selected board cards (no delete here — that
   // only applies to already-skipped/mismatched jobs in the Inactive view).
   const bulkMove = useMutation({
@@ -154,6 +173,7 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
         counts={{
           dashboard: boardTotal,
+          watchlist: stats.data?.watchlist ?? 0,
           mismatched: mismatchedCount,
           inactive: inactiveCount,
         }}
@@ -168,11 +188,13 @@ export default function App() {
             title={
               view === "dashboard"
                 ? "Dashboard"
-                : view === "mismatched"
-                  ? "Mismatched jobs"
-                  : view === "inactive"
-                    ? "Inactive jobs"
-                    : "Settings"
+                : view === "watchlist"
+                  ? "Watchlist"
+                  : view === "mismatched"
+                    ? "Mismatched jobs"
+                    : view === "inactive"
+                      ? "Inactive jobs"
+                      : "Settings"
             }
             filters={filters}
             setFilters={setFilters}
@@ -193,6 +215,10 @@ export default function App() {
           <div className="flex-1 overflow-y-auto">
             <SettingsView />
           </div>
+        ) : view === "watchlist" ? (
+          <div className="flex-1 overflow-y-auto">
+            <WatchlistView onOpen={setSelected} />
+          </div>
         ) : view === "mismatched" ? (
           <div className="flex-1 overflow-y-auto">
             <MismatchedView filters={filters} />
@@ -211,6 +237,9 @@ export default function App() {
               onToggleSelect={toggleSelect}
               onRangeSelect={selectRange}
               onClearSelection={clearSelection}
+              onToggleWatchlist={(j) =>
+                watchlist.mutate({ key: j.job_key, on: !j.watchlist })
+              }
               anchorKey={anchorKey}
               selectedKeys={selectedKeys}
             />
@@ -279,6 +308,9 @@ export default function App() {
                     jobs={visibleJobs}
                     onOpen={setFocused}
                     onIgnore={(j) => ignore.mutate(j.job_key)}
+                    onToggleWatchlist={(j) =>
+                      watchlist.mutate({ key: j.job_key, on: !j.watchlist })
+                    }
                     onMove={(key, status) => move.mutate({ key, status })}
                     onToggleSelect={toggleSelect}
                     onRangeSelect={selectRange}

@@ -44,6 +44,15 @@ class BulkStatus(BaseModel):
     status: str
 
 
+class WatchlistToggle(BaseModel):
+    on: bool = True
+
+
+class BulkWatchlist(BaseModel):
+    job_keys: List[str]
+    on: bool = True
+
+
 class JobOut(BaseModel):
     job_key: str
     title: Optional[str]
@@ -67,6 +76,7 @@ class JobOut(BaseModel):
     ignored: bool
     mismatched: bool
     mismatch_reason: Optional[str]
+    watchlist: bool                    # starred to revisit later
 
 
 class NoteIn(BaseModel):
@@ -145,6 +155,7 @@ class StatsOut(BaseModel):
     visible: int
     ignored: int
     mismatched: int = 0
+    watchlist: int = 0
     by_status: dict
 
 
