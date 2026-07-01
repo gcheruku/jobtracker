@@ -22,6 +22,10 @@ to follow [Semantic Versioning](https://semver.org/).
   `tsc -b && vite build` on every PR and on pushes to main.
 
 ### Changed
+- Deploy pipeline moved to **GHCR**: images are built on GitHub-hosted runners
+  and pushed to `ghcr.io`; the NAS runner only *pulls* and restarts (no on-device
+  build), eliminating the OOM risk on a 2 GB NAS. `docker-compose.yml` now
+  references `image:` refs instead of building locally.
 - Rewrote `README.md` for a public audience (features, architecture, "Why I
   built this").
 - Consolidated deployment docs under `docs/`.
