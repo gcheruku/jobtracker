@@ -151,6 +151,8 @@ export interface IngestSummary {
 
 export interface IngestStatus {
   running: boolean;
+  phase?: string;              // "starting" | "scoring" | …
+  scored_so_far?: number;      // live count during a run
   last_run_iso: string | null;
   last_summary: IngestSummary | null;
   last_error: string | null;
