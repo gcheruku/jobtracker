@@ -11,6 +11,7 @@ import json
 import os
 import re
 import time
+from typing import NamedTuple
 from urllib.parse import urlparse
 
 import requests
@@ -313,11 +314,23 @@ def _looks_blocked(html: str) -> bool:
     return any(marker in head for marker in _BLOCK_MARKERS)
 
 
-def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
-    """Return (job_description, expired). expired=True if the posting page shows
-    an expiry/closed banner near the top."""
+class JDResult(NamedTuple):
+    """Outcome of a JD fetch. `not_found` is a 404/410 on the posting page — a
+    stronger 'this job is gone' signal than an expiry banner, and distinct from a
+    bot wall (403/429 or a 200 challenge page), which leaves both flags False so
+    an IP block is never mistaken for a dead posting."""
+
+    description: str
+    expired: bool
+    not_found: bool
+
+
+def fetch_jd_info(url: str | None, timeout: int = 25) -> JDResult:
+    """Fetch the live posting page and classify it. Returns a JDResult with the
+    extracted description, whether an expiry banner is shown, and whether the
+    page 404/410'd (the posting was removed)."""
     if not url:
-        return "", False
+        return JDResult("", False, False)
     targets: list[str] = []
     low = url.lower()
     if "linkedin" in low:
@@ -330,21 +343,36 @@ def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
             targets.append(viewjob)
     targets.append(url)  # also try the original link as a fallback
 
+    saw_not_found = False
     for target in targets:
         try:
             resp = _http_get(target, timeout)
-            if resp is None or resp.status_code >= 400:
+            if resp is None:
+                continue  # every client raised, or the host is in bot-wall cooldown
+            if resp.status_code in (404, 410):
+                # The posting page is gone. Remember it, but keep trying other
+                # targets in case a different link still serves the live JD.
+                saw_not_found = True
                 continue
+            if resp.status_code >= 400:
+                continue  # 403/429 etc. — bot wall / transient; leave as active
             expired = _is_expired(resp.text)
             desc = _extract(resp.text)
             if desc:
                 logger.info("Fetched JD (%d chars) from %s", len(desc), target[:60])
             if desc or expired:
-                return desc, expired
+                return JDResult(desc, expired, False)
         except Exception as exc:
             logger.warning("JD fetch failed for %s: %s", target[:60], exc)
-    return "", False
+    return JDResult("", False, saw_not_found)
+
+
+def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
+    """Return (job_description, expired). expired=True if the posting page shows
+    an expiry/closed banner near the top."""
+    r = fetch_jd_info(url, timeout)
+    return r.description, r.expired
 
 
 def fetch_job_description(url: str | None, timeout: int = 25) -> str:
-    return fetch_jd_and_expiry(url, timeout)[0]
+    return fetch_jd_info(url, timeout).description

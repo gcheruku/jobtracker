@@ -2,6 +2,9 @@
 bot-wall / expiry detection, and the HTML->Markdown nested-list handling that
 once truncated LinkedIn job descriptions.
 """
+from types import SimpleNamespace
+
+from app.services import jd_fetch
 from app.services.jd_fetch import (
     _host,
     _indeed_jobview_url,
@@ -9,7 +12,12 @@ from app.services.jd_fetch import (
     _linkedin_guest_url,
     _looks_blocked,
     _to_markdown,
+    fetch_jd_info,
 )
+
+
+def _resp(status_code, text=""):
+    return SimpleNamespace(status_code=status_code, text=text)
 
 
 class TestLinkRewriting:
@@ -57,6 +65,40 @@ class TestExpiryDetection:
 
     def test_active_posting(self):
         assert _is_expired("<div>Apply now for this great role</div>") is False
+
+
+class TestFetchClassification:
+    """fetch_jd_info separates 'the posting is gone' (404/410) from a bot wall
+    (403/429/challenge) so an IP block is never mistaken for a dead posting."""
+
+    def test_404_is_not_found(self, monkeypatch):
+        monkeypatch.setattr(jd_fetch, "_http_get", lambda *a, **k: _resp(404, "Not Found"))
+        r = fetch_jd_info("https://www.example.com/jobs/view/1")
+        assert r.not_found is True and r.expired is False
+
+    def test_410_is_not_found(self, monkeypatch):
+        monkeypatch.setattr(jd_fetch, "_http_get", lambda *a, **k: _resp(410, "Gone"))
+        assert fetch_jd_info("https://www.example.com/jobs/view/1").not_found is True
+
+    def test_403_bot_wall_leaves_job_active(self, monkeypatch):
+        monkeypatch.setattr(jd_fetch, "_http_get", lambda *a, **k: _resp(403, "Access denied"))
+        r = fetch_jd_info("https://www.example.com/jobs/view/1")
+        assert r.not_found is False and r.expired is False
+
+    def test_cooldown_or_error_leaves_job_active(self, monkeypatch):
+        monkeypatch.setattr(jd_fetch, "_http_get", lambda *a, **k: None)
+        r = fetch_jd_info("https://www.example.com/jobs/view/1")
+        assert r.not_found is False and r.expired is False
+
+    def test_expiry_banner_is_expired_not_missing(self, monkeypatch):
+        html = "<div>No longer accepting applications</div>"
+        monkeypatch.setattr(jd_fetch, "_http_get", lambda *a, **k: _resp(200, html))
+        r = fetch_jd_info("https://www.example.com/jobs/view/1")
+        assert r.expired is True and r.not_found is False
+
+    def test_empty_url_is_inert(self):
+        r = fetch_jd_info(None)
+        assert r == ("", False, False)
 
 
 class TestMarkdownNestedLists:
