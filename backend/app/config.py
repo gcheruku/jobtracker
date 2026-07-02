@@ -91,6 +91,16 @@ INGEST_MAX_MESSAGES_ALL = int(os.environ.get("INGEST_MAX_MESSAGES_ALL", "2000"))
 # Run an ingest shortly after startup (in addition to the recurring schedule).
 INGEST_RUN_ON_STARTUP = os.environ.get("INGEST_RUN_ON_STARTUP", "false").lower() == "true"
 
+# --- Expired-posting sweep ----------------------------------------------------
+# Periodically re-check the Saved column and move lapsed/removed postings to the
+# Expired state (see services/expiry.py). Off by default so it's opt-in per
+# deployment; the run is network-heavy and hits job boards, so a daily cadence
+# at an off-peak hour is the intended setup.
+EXPIRY_SWEEP_ENABLED = os.environ.get("EXPIRY_SWEEP_ENABLED", "false").lower() == "true"
+EXPIRY_SWEEP_INTERVAL_HOURS = float(os.environ.get("EXPIRY_SWEEP_INTERVAL_HOURS", "24"))
+# Seconds paused between per-posting fetches (keeps the host IP off bot-walls).
+EXPIRY_SWEEP_DELAY_S = float(os.environ.get("EXPIRY_SWEEP_DELAY_S", "1.0"))
+
 # All valid statuses a job can hold (also the move targets in the drawer).
 PIPELINE_STATUSES = ["Saved", "Applied", "Interviewing", "Offer", "Rejected", "Expired"]
 
