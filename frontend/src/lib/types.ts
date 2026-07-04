@@ -177,6 +177,11 @@ export interface JobFilters {
   off_board?: boolean;
   only_mismatched?: boolean;
   watchlist?: boolean;
+  // Search "hide handled" toggle: drop jobs you've already triaged — both
+  // watchlisted (starred) and in-pipeline (Applied/Interviewing/Offer) — leaving
+  // only the untouched Saved candidate pool. The two flags always move together.
+  hide_watchlist?: boolean;
+  hide_pipeline?: boolean;
 }
 
 // Client-side dashboard filters set via the Filters popup. Each field carries

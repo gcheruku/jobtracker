@@ -48,6 +48,8 @@ export const api = {
     if (filters.off_board) p.set("off_board", "true");
     if (filters.only_mismatched) p.set("only_mismatched", "true");
     if (filters.watchlist) p.set("watchlist", "true");
+    if (filters.hide_watchlist) p.set("hide_watchlist", "true");
+    if (filters.hide_pipeline) p.set("hide_pipeline", "true");
     return http<Job[]>(`/api/jobs?${p.toString()}`);
   },
   getJob(k: string): Promise<Job> {
