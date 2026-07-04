@@ -39,6 +39,11 @@ from ..schemas import (
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
+# Board columns you're actively working, as opposed to the "Saved" candidate
+# pool. Used by the search "hide in-pipeline" toggle.
+ACTIVE_PIPELINE_STATUSES = [s for s in BOARD_STATUSES if s != BOARD_STATUSES[0]]
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -106,6 +111,10 @@ def list_jobs(
     ),
     only_mismatched: bool = Query(False, description="only preference-mismatched jobs"),
     watchlist: bool = Query(False, description="only watchlisted (starred) jobs"),
+    hide_watchlist: bool = Query(False, description="drop watchlisted (starred) jobs"),
+    hide_pipeline: bool = Query(
+        False, description="drop jobs already in the pipeline (Applied/Interviewing/Offer)"
+    ),
     sort: str = Query("recent", description="recent | match | semantic | company | title"),
 ):
     stmt = select(Job)
@@ -181,6 +190,13 @@ def list_jobs(
 
     if watchlist:
         out = [j for j in out if j.watchlist]
+    if hide_watchlist:
+        out = [j for j in out if not j.watchlist]
+
+    # "Hide in-pipeline": keep only the Saved candidate pool, dropping jobs
+    # you're already working (Applied/Interviewing/Offer).
+    if hide_pipeline:
+        out = [j for j in out if j.status not in ACTIVE_PIPELINE_STATUSES]
 
     reverse = True
     if sort == "match":
