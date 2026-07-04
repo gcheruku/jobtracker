@@ -48,7 +48,7 @@ def test_bulk_watchlist_and_filter():
             session=s, q=None, match="all", status=None, work_mode=None,
             min_salary=None, include_ignored=False, only_ignored=False,
             board_only=False, off_board=False, only_mismatched=False,
-            watchlist=True, sort="recent",
+            watchlist=True, hide_watchlist=False, hide_pipeline=False, sort="recent",
         )
         assert len(starred) == 6
         assert all(j.watchlist for j in starred)

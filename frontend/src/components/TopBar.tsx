@@ -1,4 +1,4 @@
-import { Menu, Search, X } from "lucide-react";
+import { EyeOff, Menu, Search, X } from "lucide-react";
 import type { BoardFilters, JobFilters } from "../lib/types";
 import { FetchAlertsButton } from "./FetchAlertsButton";
 import { SortMenu } from "./SortMenu";
@@ -26,6 +26,9 @@ export function TopBar({
   onMenu?: () => void;
   board?: BoardControls;
 }) {
+  const searching = (filters.q ?? "").trim() !== "";
+  // The single "hide handled" toggle drives both flags in lockstep.
+  const hideHandled = !!filters.hide_watchlist && !!filters.hide_pipeline;
   return (
     <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur sm:px-6">
       {/* Row 1: menu + title + primary action */}
@@ -54,13 +57,24 @@ export function TopBar({
           />
           <input
             value={filters.q ?? ""}
-            onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+            onChange={(e) => {
+              const q = e.target.value;
+              // Search-scoped toggles only make sense with an active query;
+              // drop them once the box empties so they don't leak into the board.
+              setFilters(
+                q.trim() === ""
+                  ? { ...filters, q, hide_watchlist: false, hide_pipeline: false }
+                  : { ...filters, q }
+              );
+            }}
             placeholder="Search roles, companies, locations…"
             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-8 text-sm outline-none focus:border-indigo-400 focus:bg-white"
           />
           {filters.q && (
             <button
-              onClick={() => setFilters({ ...filters, q: "" })}
+              onClick={() =>
+                setFilters({ ...filters, q: "", hide_watchlist: false, hide_pipeline: false })
+              }
               title="Clear search"
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
             >
@@ -91,6 +105,33 @@ export function TopBar({
           </>
         )}
       </div>
+
+      {/* Row 2b: search-scope toggle — only while a query is active. One control
+          hides jobs you've already handled (starred + in-pipeline), leaving the
+          untouched Saved pool. Both flags move together. */}
+      {searching && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              const on = !hideHandled;
+              setFilters({ ...filters, hide_watchlist: on, hide_pipeline: on });
+            }}
+            title="Hide jobs you've already handled: watchlisted (starred) and in-pipeline (Applied / Interviewing / Offer)"
+            aria-pressed={hideHandled}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
+              hideHandled
+                ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <EyeOff
+              size={13}
+              className={hideHandled ? "text-indigo-500" : "text-slate-400"}
+            />
+            Hide starred &amp; in-pipeline
+          </button>
+        </div>
+      )}
 
       {/* Row 3: active filter chips (dashboard only) */}
       {board && (
