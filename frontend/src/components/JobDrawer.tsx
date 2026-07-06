@@ -21,7 +21,7 @@ export function JobDrawer({
         transition={{ type: "spring", damping: 28, stiffness: 280 }}
         className="relative w-full max-w-md shadow-2xl"
       >
-        <JobDetail job={job} onClose={onClose} onChanged={onChanged} />
+        <JobDetail key={job.job_key} job={job} onClose={onClose} onChanged={onChanged} />
       </motion.aside>
     </div>
   );
