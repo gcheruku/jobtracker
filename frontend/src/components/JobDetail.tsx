@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Loader2,
   Star,
+  ClipboardPaste,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { PIPELINE, type Job, type PipelineStatus } from "../lib/types";
@@ -59,6 +60,10 @@ export function JobDetail({
   const [showCompare, setShowCompare] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [taskText, setTaskText] = useState("");
+  // Manual JD entry: for postings we can't auto-fetch (e.g. Glassdoor), paste
+  // the description so "Compare with Resume" has real text to score against.
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState("");
 
   const notes = useQuery({
     queryKey: ["notes", job.job_key],
@@ -106,6 +111,13 @@ export function JobDetail({
   const refreshDesc = useMutation({
     mutationFn: () => api.refreshDescription(job.job_key),
     onSuccess: onChanged,
+  });
+  const saveDesc = useMutation({
+    mutationFn: () => api.updateJob(job.job_key, { job_description: descDraft.trim() }),
+    onSuccess: () => {
+      setEditingDesc(false);
+      onChanged();
+    },
   });
   const toggleWatchlist = useMutation({
     mutationFn: () => api.setWatchlist(job.job_key, !job.watchlist),
@@ -242,41 +254,96 @@ export function JobDetail({
             </dl>
           </Section>
 
-          {/* Description (rich Markdown, not truncated) */}
-          {(job.job_description || job.url) && (
-            <section className="border-t border-slate-100 px-5 py-4">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Job description
-                </h4>
-                {job.url && (
+          {/* Description (rich Markdown, not truncated). Always shown so a JD
+              can be pasted manually when auto-fetch isn't available. */}
+          <section className="border-t border-slate-100 px-5 py-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Job description
+              </h4>
+              {!editingDesc && (
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => refreshDesc.mutate()}
-                    disabled={refreshDesc.isPending}
-                    title="Re-fetch the description from the posting"
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                    onClick={() => {
+                      setDescDraft(job.job_description ?? "");
+                      setEditingDesc(true);
+                    }}
+                    title="Paste or edit the description manually"
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50"
                   >
-                    {refreshDesc.isPending ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : (
-                      <RefreshCw size={13} />
-                    )}
-                    {job.job_description ? "Refresh" : "Load"}
+                    <ClipboardPaste size={13} />
+                    {job.job_description ? "Edit" : "Paste"}
                   </button>
-                )}
-              </div>
-              {job.job_description ? (
-                <article className="prose prose-sm max-w-none text-slate-600 prose-headings:font-semibold prose-headings:text-slate-800 prose-h1:text-base prose-h2:text-base prose-h3:text-sm prose-strong:text-slate-800 prose-a:text-indigo-600 prose-li:my-0.5 prose-p:leading-relaxed">
-                  <Markdown>{job.job_description}</Markdown>
-                </article>
-              ) : (
-                <p className="text-sm text-slate-400">
-                  No description loaded yet
-                  {refreshDesc.isError ? " — couldn't fetch it from the posting." : "."}
-                </p>
+                  {job.url && (
+                    <button
+                      onClick={() => refreshDesc.mutate()}
+                      disabled={refreshDesc.isPending}
+                      title="Re-fetch the description from the posting"
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {refreshDesc.isPending ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <RefreshCw size={13} />
+                      )}
+                      {job.job_description ? "Refresh" : "Load"}
+                    </button>
+                  )}
+                </div>
               )}
-            </section>
-          )}
+            </div>
+
+            {editingDesc ? (
+              <div className="space-y-2">
+                <textarea
+                  value={descDraft}
+                  onChange={(e) => setDescDraft(e.target.value)}
+                  autoFocus
+                  rows={12}
+                  placeholder="Paste the full job description here…"
+                  className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed outline-none focus:border-indigo-400"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => saveDesc.mutate()}
+                    disabled={saveDesc.isPending || descDraft.trim() === (job.job_description ?? "")}
+                    className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    {saveDesc.isPending && <Loader2 size={13} className="animate-spin" />}
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingDesc(false)}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <span
+                    className={`text-xs ${
+                      descDraft.trim().length >= 200 ? "text-emerald-600" : "text-slate-400"
+                    }`}
+                  >
+                    {descDraft.trim().length} chars
+                    {descDraft.trim().length < 200 && " · 200+ recommended for scoring"}
+                  </span>
+                  {saveDesc.isError && (
+                    <span className="text-xs text-rose-500">Couldn’t save — try again.</span>
+                  )}
+                </div>
+              </div>
+            ) : job.job_description ? (
+              <article className="prose prose-sm max-w-none text-slate-600 prose-headings:font-semibold prose-headings:text-slate-800 prose-h1:text-base prose-h2:text-base prose-h3:text-sm prose-strong:text-slate-800 prose-a:text-indigo-600 prose-li:my-0.5 prose-p:leading-relaxed">
+                <Markdown>{job.job_description}</Markdown>
+              </article>
+            ) : (
+              <p className="text-sm text-slate-400">
+                No description loaded yet
+                {refreshDesc.isError ? " — couldn't fetch it from the posting." : "."}{" "}
+                Hit <span className="font-medium text-slate-500">Paste</span> to add it
+                manually and enable resume scoring.
+              </p>
+            )}
+          </section>
 
           {/* Notes */}
           <Section title="Personal notes">
