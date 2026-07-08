@@ -20,6 +20,10 @@ class JobCreate(BaseModel):
     source: Optional[str] = "manual"
 
 
+class JobFromURL(BaseModel):
+    url: str
+
+
 class JobUpdate(BaseModel):
     title: Optional[str] = None
     company: Optional[str] = None
