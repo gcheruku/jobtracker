@@ -72,7 +72,13 @@ _POSTING_PATTERNS = (
     "joblisting",      # Glassdoor
     "/jobs/view",      # LinkedIn
     "/rc/clk", "/viewjob", "jk=", "/pagead/clk",  # Indeed
-    "dice.com/job", "/job-detail", "/jobs/detail",  # Dice
+    "dice.com/job", "/job-detail", "/jobs/detail",  # Dice (direct links)
+    # Dice alert emails wrap every job in an opaque click-tracker
+    # (e.g. elinks.dice.com/a/sc/<token>/<token>/22) with no decodable target
+    # URL. We accept these as posting candidates and rely on the tile-text skip
+    # markers + the LLM tile extractor to drop nav links (unsubscribe, "see all
+    # jobs", etc.), exactly as we already do for other providers.
+    "dice.com/a/sc/",  # Dice email click-tracker
 )
 
 
