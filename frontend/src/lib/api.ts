@@ -58,6 +58,12 @@ export const api = {
   createJob(body: Partial<Job>): Promise<Job> {
     return http<Job>(`/api/jobs`, { method: "POST", body: JSON.stringify(body) });
   },
+  createJobFromUrl(url: string): Promise<Job> {
+    return http<Job>(`/api/jobs/from-url`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+  },
   updateJob(k: string, body: Partial<Job>): Promise<Job> {
     return http<Job>(`/api/jobs/${key(k)}`, {
       method: "PATCH",

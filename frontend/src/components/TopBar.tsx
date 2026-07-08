@@ -1,5 +1,6 @@
 import { EyeOff, Menu, Search, X } from "lucide-react";
-import type { BoardFilters, JobFilters } from "../lib/types";
+import type { BoardFilters, Job, JobFilters } from "../lib/types";
+import { AddJobButton } from "./AddJobButton";
 import { FetchAlertsButton } from "./FetchAlertsButton";
 import { SortMenu } from "./SortMenu";
 import { BoardFilterMenu, BoardFilterChips } from "./BoardFilterMenu";
@@ -19,12 +20,16 @@ export function TopBar({
   setFilters,
   onMenu,
   board,
+  onJobAdded,
 }: {
   title: string;
   filters: JobFilters;
   setFilters: (f: JobFilters) => void;
   onMenu?: () => void;
   board?: BoardControls;
+  // When provided (dashboard), shows the "Add job" button; called with the
+  // newly-created job so the parent can open it.
+  onJobAdded?: (job: Job) => void;
 }) {
   const searching = (filters.q ?? "").trim() !== "";
   // The single "hide handled" toggle drives both flags in lockstep.
@@ -43,7 +48,8 @@ export function TopBar({
 
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {onJobAdded && <AddJobButton onAdded={onJobAdded} />}
           <FetchAlertsButton />
         </div>
       </div>

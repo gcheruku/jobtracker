@@ -260,6 +260,13 @@ def _extract(html: str) -> str:
             md = _to_markdown(str(el))
             if len(md) >= _MIN_CHARS:
                 return md
+    # 3) Embedded JSON (Next.js __NEXT_DATA__ / SPA career sites): the JD ships in
+    #    a data blob even when the page renders client-side (e.g. Walmart).
+    job = _embedded_job(soup)
+    if job:
+        md = _to_markdown(_job_description_html(job))
+        if len(md) >= _MIN_CHARS:
+            return md
     return ""
 
 
@@ -325,12 +332,12 @@ class JDResult(NamedTuple):
     not_found: bool
 
 
-def fetch_jd_info(url: str | None, timeout: int = 25) -> JDResult:
-    """Fetch the live posting page and classify it. Returns a JDResult with the
-    extracted description, whether an expiry banner is shown, and whether the
-    page 404/410'd (the posting was removed)."""
-    if not url:
-        return JDResult("", False, False)
+def _best_page(url: str, timeout: int) -> tuple[str, str, bool, bool]:
+    """(html, description, expired, not_found) for the first target that yields a
+    JD or an expiry banner; ("", "", False, saw_not_found) otherwise.
+
+    Shared by fetch_jd_info (description only) and fetch_job_posting (which also
+    parses the winning page's JSON-LD for title/company/location/salary)."""
     targets: list[str] = []
     low = url.lower()
     if "linkedin" in low:
@@ -361,10 +368,20 @@ def fetch_jd_info(url: str | None, timeout: int = 25) -> JDResult:
             if desc:
                 logger.info("Fetched JD (%d chars) from %s", len(desc), target[:60])
             if desc or expired:
-                return JDResult(desc, expired, False)
+                return resp.text, desc, expired, False
         except Exception as exc:
             logger.warning("JD fetch failed for %s: %s", target[:60], exc)
-    return JDResult("", False, saw_not_found)
+    return "", "", False, saw_not_found
+
+
+def fetch_jd_info(url: str | None, timeout: int = 25) -> JDResult:
+    """Fetch the live posting page and classify it. Returns a JDResult with the
+    extracted description, whether an expiry banner is shown, and whether the
+    page 404/410'd (the posting was removed)."""
+    if not url:
+        return JDResult("", False, False)
+    _html, desc, expired, not_found = _best_page(url, timeout)
+    return JDResult(desc, expired, not_found)
 
 
 def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
@@ -376,3 +393,217 @@ def fetch_jd_and_expiry(url: str | None, timeout: int = 25) -> tuple[str, bool]:
 
 def fetch_job_description(url: str | None, timeout: int = 25) -> str:
     return fetch_jd_info(url, timeout).description
+
+
+# --- structured extraction (for adding a job from its career-portal URL) ------
+
+class JobPosting(NamedTuple):
+    """A posting fetched from its URL: the JD plus any structured fields we could
+    read from the page's JSON-LD JobPosting. Empty strings for anything absent."""
+
+    description: str
+    title: str
+    company: str
+    location: str
+    salary: str
+    expired: bool
+    not_found: bool
+
+
+def _clean(value) -> str:
+    if not isinstance(value, str):
+        return ""
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _jsonld_location(loc) -> str:
+    """Best-effort 'City, ST' (or country) from a JSON-LD jobLocation."""
+    if isinstance(loc, list):
+        for item in loc:
+            got = _jsonld_location(item)
+            if got:
+                return got
+        return ""
+    if not isinstance(loc, dict):
+        return ""
+    addr = loc.get("address")
+    if isinstance(addr, str):
+        return _clean(addr)
+    if not isinstance(addr, dict):
+        return ""
+    city = _clean(addr.get("addressLocality"))
+    region = _clean(addr.get("addressRegion"))
+    country = _clean(addr.get("addressCountry")) if isinstance(addr.get("addressCountry"), str) else ""
+    if city and region:
+        return f"{city}, {region}"
+    return city or region or country
+
+
+def _jsonld_salary(base) -> str:
+    """Best-effort salary string from a JSON-LD baseSalary MonetaryAmount."""
+    if not isinstance(base, dict):
+        return ""
+    val = base.get("value")
+    currency = _clean(base.get("currency")) or "$"
+    sym = "$" if currency in ("$", "USD") else currency + " "
+    if isinstance(val, dict):
+        lo = val.get("minValue") or val.get("value")
+        hi = val.get("maxValue")
+        unit = _clean(val.get("unitText")).lower()
+        per = {"hour": "/hr", "day": "/day", "week": "/wk", "month": "/mo", "year": "/yr"}.get(unit, "")
+        if lo and hi and lo != hi:
+            return f"{sym}{int(float(lo)):,} - {sym}{int(float(hi)):,}{per}"
+        if lo:
+            return f"{sym}{int(float(lo)):,}{per}"
+    elif isinstance(val, (int, float, str)):
+        try:
+            return f"{sym}{int(float(val)):,}"
+        except (TypeError, ValueError):
+            return ""
+    return ""
+
+
+# Keys under which career SPAs stash the JD HTML inside their page JSON.
+_DESC_KEYS = ("description", "jobPostingDescription", "jobDescription", "externalJobDescription")
+
+
+def _embedded_job(soup) -> dict:
+    """Find a job object embedded in the page's JSON — Next.js __NEXT_DATA__ or any
+    application/json script. Career SPAs (Walmart, etc.) render client-side but
+    still ship the job (title/description/location/pay) in this blob. Returns the
+    dict carrying the longest HTML description, or {}."""
+    scripts = list(soup.find_all("script", id="__NEXT_DATA__"))
+    scripts += soup.find_all("script", type="application/json")
+    best: dict = {}
+    best_len = 0
+    for sc in scripts:
+        try:
+            data = json.loads(sc.string or "{}")
+        except Exception:
+            continue
+        stack = [data]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, dict):
+                for dk in _DESC_KEYS:
+                    v = node.get(dk)
+                    if isinstance(v, str) and len(v) > best_len:
+                        best, best_len = node, len(v)
+                        break
+                stack.extend(node.values())
+            elif isinstance(node, list):
+                stack.extend(node)
+    return best
+
+
+def _job_description_html(job: dict) -> str:
+    for dk in _DESC_KEYS:
+        v = job.get(dk)
+        if isinstance(v, str) and v.strip():
+            return v
+    return ""
+
+
+def _titlecase(s: str) -> str:
+    """'DALLAS' -> 'Dallas'; leave already-cased strings alone."""
+    return s.title() if s and s.isupper() else s
+
+
+def _job_company(job: dict) -> str:
+    for k in ("companyName", "company", "hiringCompany", "brand", "employer"):
+        v = job.get(k)
+        if isinstance(v, str) and v.strip():
+            return _clean(v)
+    return ""
+
+
+def _job_location(job: dict) -> str:
+    loc = job.get("primaryLocation") or job.get("location") or job.get("jobLocation")
+    if isinstance(loc, str):
+        return _clean(loc)
+    if isinstance(loc, dict):
+        city = _titlecase(_clean(loc.get("city") or loc.get("addressLocality")))
+        state = _clean(loc.get("stateCode") or loc.get("state") or loc.get("addressRegion"))
+        if city and state:
+            return f"{city}, {state}"
+        return city or state or _titlecase(_clean(loc.get("locationName")))
+    return ""
+
+
+def _job_salary(job: dict) -> str:
+    pay = job.get("payRange") or job.get("salary")
+    if isinstance(pay, list) and pay:
+        pay = pay[0]
+    if isinstance(pay, str):
+        return _clean(pay)
+    if isinstance(pay, dict):
+        lo = pay.get("min") or pay.get("minValue")
+        hi = pay.get("max") or pay.get("maxValue")
+        freq = str(job.get("payFrequency") or pay.get("unitText") or "").lower()
+        per = "/yr" if freq.startswith(("annual", "year")) else ("/hr" if "hour" in freq else "")
+        try:
+            if lo and hi:
+                return f"${int(float(lo)):,} - ${int(float(hi)):,}{per}"
+            if lo:
+                return f"${int(float(lo)):,}{per}"
+        except (TypeError, ValueError):
+            return ""
+    return ""
+
+
+def _extract_meta(html: str) -> dict:
+    """Pull title/company/location/salary from a JSON-LD JobPosting (which Google
+    for Jobs requires career portals to emit), then from an embedded Next.js/SPA
+    job blob, then og:title/<title> for the title. Anything still missing stays ""
+    and is filled by the LLM downstream."""
+    soup = BeautifulSoup(html, "lxml")
+    meta = {"title": "", "company": "", "location": "", "salary": ""}
+    for sc in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(sc.string or "{}")
+        except Exception:
+            continue
+        for obj in data if isinstance(data, list) else [data]:
+            if not (isinstance(obj, dict) and "JobPosting" in str(obj.get("@type", ""))):
+                continue
+            meta["title"] = meta["title"] or _clean(obj.get("title"))
+            org = obj.get("hiringOrganization")
+            if isinstance(org, dict):
+                meta["company"] = meta["company"] or _clean(org.get("name"))
+            elif isinstance(org, str):
+                meta["company"] = meta["company"] or _clean(org)
+            meta["location"] = meta["location"] or _jsonld_location(obj.get("jobLocation"))
+            meta["salary"] = meta["salary"] or _jsonld_salary(obj.get("baseSalary"))
+    if not all(meta.values()):
+        job = _embedded_job(soup)
+        if job:
+            meta["title"] = meta["title"] or _clean(
+                job.get("title") or job.get("jobPostingTitle") or job.get("jobTitle")
+            )
+            meta["company"] = meta["company"] or _job_company(job)
+            meta["location"] = meta["location"] or _job_location(job)
+            meta["salary"] = meta["salary"] or _job_salary(job)
+    if not meta["title"]:
+        og = soup.find("meta", attrs={"property": "og:title"})
+        if og and og.get("content"):
+            meta["title"] = _clean(og["content"])
+        elif soup.title and soup.title.string:
+            meta["title"] = _clean(soup.title.string)
+    return meta
+
+
+def fetch_job_posting(url: str | None, timeout: int = 25) -> JobPosting:
+    """Fetch a posting URL and return its JD plus structured fields (JSON-LD)."""
+    if not url:
+        return JobPosting("", "", "", "", "", False, False)
+    html, desc, expired, not_found = _best_page(url, timeout)
+    meta = _extract_meta(html) if html else {}
+    return JobPosting(
+        description=desc,
+        title=meta.get("title", ""),
+        company=meta.get("company", ""),
+        location=meta.get("location", ""),
+        salary=meta.get("salary", ""),
+        expired=expired,
+        not_found=not_found,
+    )

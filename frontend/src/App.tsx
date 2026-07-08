@@ -198,6 +198,7 @@ export default function App() {
             }
             filters={filters}
             setFilters={setFilters}
+            onJobAdded={view === "dashboard" ? setSelected : undefined}
             board={
               view === "dashboard" && !searching
                 ? {

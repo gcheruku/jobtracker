@@ -203,6 +203,28 @@ def parse_tiles(tiles: List[dict]) -> List[dict]:
         return []
 
 
+def extract_job_fields(text: str, url: str = "") -> dict:
+    """Best-effort {title,company,location,salary,work_mode} from ONE posting's
+    text. Used when a career page lacks JSON-LD structured data. Returns {} if no
+    client is configured or on failure, so the caller can degrade gracefully."""
+    if _get_client() is None or not text:
+        return {}
+    prompt = (
+        "From this ONE job posting, extract a JSON object with keys "
+        '"title","company","location","salary","work_mode". work_mode is one of '
+        '"Remote","Hybrid","On-site" or "". Use "" for anything not stated. '
+        f"Source URL: {url}\n\nReturn ONLY a minified JSON object.\n\n" + text[:6000]
+    )
+    try:
+        data = _gen_json(prompt, "{", "}")
+        if isinstance(data, dict):
+            keys = ("title", "company", "location", "salary", "work_mode")
+            return {k: (data.get(k) or "") for k in keys}
+    except Exception as exc:
+        logger.warning("Gemini job-field extract failed: %s", exc)
+    return {}
+
+
 def score_job(job: dict, resume: str) -> Optional[dict]:
     """Return {match:int, matched:[], missing:[], summary:str} or None."""
     if _get_client() is None or not resume:

@@ -18,8 +18,11 @@ from ..config import (
     STATUS_DISPLAY_MAP,
 )
 from ..database import get_session
+from ..logging_config import logger
 from ..models import ChecklistItem, Job, Note
-from ..services.jd_fetch import fetch_job_description
+from ..services.gemini_client import extract_job_fields
+from ..services.jd_fetch import fetch_job_description, fetch_job_posting
+from ..services.semantic import score_and_persist
 from ..schemas import (
     BulkKeys,
     BulkStatus,
@@ -28,6 +31,7 @@ from ..schemas import (
     ChecklistItemOut,
     ChecklistItemUpdate,
     JobCreate,
+    JobFromURL,
     JobOut,
     JobUpdate,
     NoteIn,
@@ -252,6 +256,78 @@ def create_job(payload: JobCreate, session: Session = Depends(get_session)):
     session.add(job)
     session.commit()
     session.refresh(job)
+    return _to_out(job)
+
+
+@router.post("/from-url", response_model=JobOut, status_code=201)
+def create_job_from_url(payload: JobFromURL, session: Session = Depends(get_session)):
+    """Add a job from a career-portal posting URL: fetch the page, read its
+    title/company/location/salary + description (JSON-LD, with an LLM fallback),
+    create the job, and run the semantic match. LLM compare is run on demand from
+    the UI afterwards (the description is now stored, so it works)."""
+    url = (payload.url or "").strip()
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "Provide a valid job posting URL (http/https).")
+
+    # Idempotent: if this exact posting is already tracked, just return it.
+    existing = session.exec(select(Job).where(Job.url == url)).first()
+    if existing:
+        return _to_out(existing)
+
+    posting = fetch_job_posting(url)
+    if posting.not_found:
+        raise HTTPException(422, "That posting page returned 404 — check the link.")
+
+    title, company = posting.title, posting.company
+    location, salary, work_mode = posting.location, posting.salary, ""
+    # Fill anything the structured data missed via the LLM (best-effort).
+    if (not title or not company) and posting.description:
+        fields = extract_job_fields(posting.description, url)
+        title = title or fields.get("title", "")
+        company = company or fields.get("company", "")
+        location = location or fields.get("location", "")
+        salary = salary or fields.get("salary", "")
+        work_mode = fields.get("work_mode", "")
+
+    if not title and not company:
+        raise HTTPException(
+            422,
+            "Couldn't read the job details from that link (it may require login or "
+            "block automated access). Try the company's direct posting URL, or add "
+            "it manually with the fields you have.",
+        )
+
+    seed = f"{company}|{title}|{_now()}"
+    job = Job(
+        job_key="manual-" + hashlib.sha1(seed.encode()).hexdigest()[:16],
+        title=title or None,
+        company=company or None,
+        location=location or None,
+        url=url,
+        salary=salary or None,
+        work_mode=work_mode or None,
+        job_description=posting.description or None,
+        source="Manual",
+        # NOTE: deliberately no email_epoch — that column feeds the Gmail ingest
+        # watermark, and a manual add must never advance it.
+        email_date=_now(),
+        inserted_at=_now(),
+        status=PIPELINE_STATUSES[0],  # "Saved"
+        status_updated_at=_now(),
+        ignored=False,
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+
+    # Semantic match now (JD already stored; score_and_persist uses it directly).
+    try:
+        score_and_persist(session, job)
+        session.commit()
+        session.refresh(job)
+    except Exception:
+        logger.exception("Semantic scoring failed for %s", job.job_key)
+
     return _to_out(job)
 
 
