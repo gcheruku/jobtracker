@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, MapPin } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { BOARD_STATUSES, type Job, type PipelineStatus } from "../lib/types";
 import { STATUS_STYLES, initials } from "../lib/ui";
 import { MatchBadge } from "./MatchBadge";
@@ -89,15 +89,40 @@ export function FocusView({
     if (first) onSelect(first);
   }
 
+  // Position within the current column, and the neighbours for swipe / prev-next.
+  const idx = columnJobs.findIndex((j) => j.job_key === selected.job_key);
+  const prevJob = idx > 0 ? columnJobs[idx - 1] : null; // one up the list
+  const nextJob =
+    idx >= 0 && idx < columnJobs.length - 1 ? columnJobs[idx + 1] : null; // one down
+
   // After skipping, stay in the side-by-side view and load the next job in the
   // column (or the previous one if we skipped the last); only fall back to the
   // board when the column is now empty.
   function handleSkipped() {
-    const idx = columnJobs.findIndex((j) => j.job_key === selected.job_key);
     const next = columnJobs[idx + 1] ?? columnJobs[idx - 1];
     if (next && next.job_key !== selected.job_key) onSelect(next);
     else onBack();
   }
+
+  // Mobile: horizontal swipe moves through the column — left = up the list
+  // (previous), right = down (next). Swipes that start at the very left edge are
+  // left to iOS's native back gesture, and vertical-dominant moves stay scrolls.
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s = touchStart.current;
+    touchStart.current = null;
+    if (!s || s.x < 24) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0) prevJob && onSelect(prevJob);
+    else nextJob && onSelect(nextJob);
+  };
 
   return (
     <div className="relative flex flex-1 overflow-hidden">
@@ -148,16 +173,43 @@ export function FocusView({
         </div>
       </aside>
 
-      {/* Right: selected job detail */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile-only bar: back to board (the view is purely the job detail) */}
-        <div className="flex items-center border-b border-slate-200 bg-white px-4 py-2.5 md:hidden">
+      {/* Right: selected job detail (swipe left/right to move through the column) */}
+      <div
+        className="flex min-w-0 flex-1 flex-col"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Mobile-only bar: back to board + prev/next through the column. */}
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5 md:hidden">
           <button
             onClick={onBack}
             className="flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-slate-900"
           >
             <ArrowLeft size={18} /> Back
           </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => prevJob && onSelect(prevJob)}
+              disabled={!prevJob}
+              title="Previous job"
+              className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 disabled:opacity-30"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            {idx >= 0 && columnJobs.length > 0 && (
+              <span className="min-w-[3rem] text-center text-xs tabular-nums text-slate-400">
+                {idx + 1} / {columnJobs.length}
+              </span>
+            )}
+            <button
+              onClick={() => nextJob && onSelect(nextJob)}
+              disabled={!nextJob}
+              title="Next job"
+              className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 disabled:opacity-30"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1">
           <JobDetail
