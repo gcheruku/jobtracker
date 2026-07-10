@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Activity, ChevronDown, EyeOff, X } from "lucide-react";
 import { Sidebar, type View } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
@@ -24,9 +25,32 @@ import { BOARD_STATUSES, OFF_BOARD_STATUSES, PIPELINE } from "./lib/types";
 import { applyBoardFilters } from "./lib/filters";
 import type { BoardFilters, Job, JobFilters, PipelineStatus } from "./lib/types";
 
+// Each screen has a URL so browser back / iOS edge-swipe / refresh / bookmarking
+// all work. A job opens as `?job=<key>` on top of the current screen, so the
+// list underneath stays mounted (its scroll is preserved) and back closes it.
+const VIEW_PATH: Record<View, string> = {
+  dashboard: "/",
+  watchlist: "/watchlist",
+  mismatched: "/mismatched",
+  inactive: "/inactive",
+  settings: "/settings",
+};
+
+function viewForPath(pathname: string): View {
+  for (const [v, p] of Object.entries(VIEW_PATH) as [View, string][]) {
+    if (p === pathname) return v;
+  }
+  return "dashboard";
+}
+
 export default function App() {
   const qc = useQueryClient();
-  const [view, setViewState] = useState<View>("dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Screen + open job are derived from the URL (see VIEW_PATH above).
+  const view = viewForPath(location.pathname);
+  const openJobKey = new URLSearchParams(location.search).get("job");
+
   const [filters, setFilters] = useState<JobFilters>({ sort: "recent" });
   // Dashboard-only client-side filters (Filters popup).
   const [boardFilters, setBoardFilters] = useState<BoardFilters>({});
@@ -34,28 +58,36 @@ export default function App() {
   // last single-selected card, used as the start of a Shift+click range.
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [anchorKey, setAnchorKey] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Job | null>(null);
   // The drawer lives behind a lazy boundary; mount it on the first open and
   // keep it mounted so its slide-out (exit) animation still plays on close.
   const [drawerMounted, setDrawerMounted] = useState(false);
-  useEffect(() => {
-    if (selected) setDrawerMounted(true);
-  }, [selected]);
-  // The board card the user drilled into (full-screen focus view).
-  const [focused, setFocused] = useState<Job | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
   // Off-canvas sidebar on mobile.
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Switching views always leaves the focus view, clears selection, and closes
-  // the mobile nav.
-  const setView = (v: View) => {
-    setFocused(null);
+  // Changing screen (path) clears multi-select and closes the mobile nav. Note
+  // opening a job only changes the query string, so it doesn't trigger this.
+  useEffect(() => {
     setSelectedKeys(new Set());
     setAnchorKey(null);
     setSidebarOpen(false);
-    setViewState(v);
-  };
+  }, [location.pathname]);
+
+  const setView = (v: View) => navigate(VIEW_PATH[v]);
+
+  // Open a job as `?job=<key>` on the current screen. Switching jobs (list click
+  // / swipe) replaces history so Back returns to the list, not the prior job.
+  const goToJob = (j: Job, opts?: { replace?: boolean }) =>
+    navigate(
+      { pathname: location.pathname, search: `?job=${encodeURIComponent(j.job_key)}` },
+      { replace: opts?.replace }
+    );
+  // Close the detail: pop history when we pushed it in-app (so it feels like a
+  // real back), else (deep link / refresh) just strip the ?job= param.
+  const closeJob = () =>
+    location.key !== "default"
+      ? navigate(-1)
+      : navigate({ pathname: location.pathname }, { replace: true });
 
   const toggleSelect = (j: Job) => {
     setAnchorKey(j.job_key);
@@ -100,6 +132,35 @@ export default function App() {
     qc.invalidateQueries({ queryKey: ["jobs"] });
     qc.invalidateQueries({ queryKey: ["stats"] });
     qc.invalidateQueries({ queryKey: ["activity"] });
+  };
+
+  // The job open in the detail overlay (from ?job=). Prefer the cached board
+  // copy (carries optimistic updates); fall back to fetching it directly so a
+  // deep link / refresh to /?job=KEY still resolves the job.
+  const jobQuery = useQuery({
+    queryKey: ["job", openJobKey],
+    queryFn: () => api.getJob(openJobKey!),
+    enabled: !!openJobKey,
+  });
+  const activeJob = useMemo(
+    () =>
+      openJobKey
+        ? visibleJobs.find((j) => j.job_key === openJobKey) ?? jobQuery.data ?? null
+        : null,
+    [openJobKey, visibleJobs, jobQuery.data]
+  );
+  // Board detail is the full-screen focus overlay; watchlist/search use the drawer.
+  const boardFocus = view === "dashboard" && !searching ? activeJob : null;
+  const drawerJob =
+    view === "watchlist" || (view === "dashboard" && searching) ? activeJob : null;
+  useEffect(() => {
+    if (drawerJob) setDrawerMounted(true);
+  }, [drawerJob]);
+
+  // Keep the open job in sync after a change (status move, JD paste, skip, …).
+  const onDetailChanged = () => {
+    refresh();
+    if (openJobKey) qc.invalidateQueries({ queryKey: ["job", openJobKey] });
   };
 
   // Optimistic status move so the card jumps columns instantly.
@@ -179,10 +240,10 @@ export default function App() {
         }}
       />
 
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* On mobile the focus view is purely the job detail, so hide the top
             bar (search, filters, Fetch alerts) there. */}
-        <div className={focused ? "hidden md:block" : ""}>
+        <div className={boardFocus ? "hidden md:block" : ""}>
           <TopBar
             onMenu={() => setSidebarOpen(true)}
             title={
@@ -198,7 +259,7 @@ export default function App() {
             }
             filters={filters}
             setFilters={setFilters}
-            onJobAdded={view === "dashboard" ? setSelected : undefined}
+            onJobAdded={view === "dashboard" ? goToJob : undefined}
             board={
               view === "dashboard" && !searching
                 ? {
@@ -218,7 +279,7 @@ export default function App() {
           </div>
         ) : view === "watchlist" ? (
           <div className="flex-1 overflow-y-auto">
-            <WatchlistView onOpen={setSelected} />
+            <WatchlistView onOpen={goToJob} />
           </div>
         ) : view === "mismatched" ? (
           <div className="flex-1 overflow-y-auto">
@@ -234,7 +295,7 @@ export default function App() {
           >
             <SearchResults
               filters={filters}
-              onOpen={setSelected}
+              onOpen={goToJob}
               onToggleSelect={toggleSelect}
               onRangeSelect={selectRange}
               onClearSelection={clearSelection}
@@ -245,23 +306,6 @@ export default function App() {
               selectedKeys={selectedKeys}
             />
           </div>
-        ) : focused ? (
-          <Suspense
-            fallback={
-              <div className="grid flex-1 place-items-center text-slate-400">Loading…</div>
-            }
-          >
-            <FocusView
-              jobs={visibleJobs}
-              selected={focused}
-              onSelect={setFocused}
-              onBack={() => setFocused(null)}
-              onChanged={() => {
-                refresh();
-                api.getJob(focused.job_key).then(setFocused).catch(() => {});
-              }}
-            />
-          </Suspense>
         ) : (
           // No top padding here: the sticky column dropdown pins flush against
           // the top bar (top padding would leave a strip where cards show
@@ -307,7 +351,7 @@ export default function App() {
                 ) : (
                   <KanbanBoard
                     jobs={visibleJobs}
-                    onOpen={setFocused}
+                    onOpen={goToJob}
                     onIgnore={(j) => ignore.mutate(j.job_key)}
                     onToggleWatchlist={(j) =>
                       watchlist.mutate({ key: j.job_key, on: !j.watchlist })
@@ -353,10 +397,33 @@ export default function App() {
           </div>
         )}
 
+        {/* Board detail as a full-screen overlay INSIDE main: the board list
+            stays mounted underneath, so returning (Back / iOS edge-swipe)
+            restores the list exactly where it was scrolled. */}
+        {boardFocus && (
+          <Suspense
+            fallback={
+              <div className="absolute inset-0 z-30 grid place-items-center bg-white text-slate-400">
+                Loading…
+              </div>
+            }
+          >
+            <div className="absolute inset-0 z-30 flex flex-col bg-white">
+              <FocusView
+                jobs={visibleJobs}
+                selected={boardFocus}
+                onSelect={(j) => goToJob(j, { replace: true })}
+                onBack={closeJob}
+                onChanged={onDetailChanged}
+              />
+            </div>
+          </Suspense>
+        )}
+
         {/* Multi-select action bar — shared by the board and search results
             (both are the dashboard view). Fixed-positioned, so it overlays
             whichever list is showing. */}
-        {view === "dashboard" && selectedKeys.size > 0 && (
+        {view === "dashboard" && !boardFocus && selectedKeys.size > 0 && (
           <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-3">
             <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-2xl">
               <span className="text-sm font-semibold text-indigo-700">
@@ -405,16 +472,7 @@ export default function App() {
 
       {drawerMounted && (
         <Suspense fallback={null}>
-          <DrawerHost
-            job={selected}
-            onClose={() => setSelected(null)}
-            onChanged={() => {
-              if (!selected) return;
-              refresh();
-              // keep the drawer's job in sync after a status change
-              api.getJob(selected.job_key).then(setSelected).catch(() => {});
-            }}
-          />
+          <DrawerHost job={drawerJob} onClose={closeJob} onChanged={onDetailChanged} />
         </Suspense>
       )}
 
