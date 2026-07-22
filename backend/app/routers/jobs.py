@@ -19,7 +19,7 @@ from ..config import (
 )
 from ..database import get_session
 from ..logging_config import logger
-from ..models import ChecklistItem, Job, Note
+from ..models import ChecklistItem, CompanyPortal, Job, Note
 from ..services.gemini_client import extract_job_fields
 from ..services.jd_fetch import fetch_job_description, fetch_job_posting
 from ..services.semantic import score_and_persist
@@ -36,6 +36,7 @@ from ..schemas import (
     JobUpdate,
     NoteIn,
     NoteOut,
+    PortalIn,
     StatusMove,
     WatchlistToggle,
 )
@@ -58,7 +59,22 @@ def _display_status(raw: Optional[str]) -> str:
     return STATUS_DISPLAY_MAP.get(raw, raw)
 
 
-def _to_out(job: Job) -> JobOut:
+def _company_key(company: Optional[str]) -> str:
+    """Normalize a company name into the lookup key for its shared portal URL:
+    lowercased with collapsed internal whitespace, so trivial variations of the
+    same company still map to one entry."""
+    return re.sub(r"\s+", " ", (company or "").strip()).lower()
+
+
+def _portal_url(session: Session, company: Optional[str]) -> Optional[str]:
+    key = _company_key(company)
+    if not key:
+        return None
+    row = session.get(CompanyPortal, key)
+    return row.portal_url if row and row.portal_url else None
+
+
+def _to_out(job: Job, portal_url: Optional[str] = None) -> JobOut:
     return JobOut(
         job_key=job.job_key,
         title=job.title,
@@ -83,7 +99,13 @@ def _to_out(job: Job) -> JobOut:
         mismatched=bool(job.mismatched),
         mismatch_reason=job.mismatch_reason,
         watchlist=bool(job.watchlist),
+        portal_url=portal_url,
     )
+
+
+def _out(session: Session, job: Job) -> JobOut:
+    """_to_out with the company's shared portal URL looked up (single-job paths)."""
+    return _to_out(job, _portal_url(session, job.company))
 
 
 def _phrase_pattern(q: str) -> Optional[re.Pattern[str]]:
@@ -154,7 +176,14 @@ def list_jobs(
                 stmt = stmt.where(clause)
 
     jobs = session.exec(stmt).all()
-    out = [_to_out(j) for j in jobs]
+    # Batch-load every company's shared portal URL once, then map by company —
+    # avoids an N+1 query per job in the list.
+    portals = {
+        p.company_key: p.portal_url
+        for p in session.exec(select(CompanyPortal)).all()
+        if p.portal_url
+    }
+    out = [_to_out(j, portals.get(_company_key(j.company))) for j in jobs]
 
     # "phrase": exact, whole-word contiguous match, refined in Python so
     # "software engineer" excludes "Software Engineering Manager".
@@ -229,7 +258,7 @@ def get_job(job_key: str, session: Session = Depends(get_session)):
     job = session.get(Job, job_key)
     if not job:
         raise HTTPException(404, "Job not found")
-    return _to_out(job)
+    return _out(session, job)
 
 
 @router.post("", response_model=JobOut, status_code=201)
@@ -256,7 +285,7 @@ def create_job(payload: JobCreate, session: Session = Depends(get_session)):
     session.add(job)
     session.commit()
     session.refresh(job)
-    return _to_out(job)
+    return _out(session, job)
 
 
 @router.post("/from-url", response_model=JobOut, status_code=201)
@@ -272,7 +301,7 @@ def create_job_from_url(payload: JobFromURL, session: Session = Depends(get_sess
     # Idempotent: if this exact posting is already tracked, just return it.
     existing = session.exec(select(Job).where(Job.url == url)).first()
     if existing:
-        return _to_out(existing)
+        return _out(session, existing)
 
     posting = fetch_job_posting(url)
     if posting.not_found:
@@ -328,7 +357,7 @@ def create_job_from_url(payload: JobFromURL, session: Session = Depends(get_sess
     except Exception:
         logger.exception("Semantic scoring failed for %s", job.job_key)
 
-    return _to_out(job)
+    return _out(session, job)
 
 
 @router.patch("/{job_key}", response_model=JobOut)
@@ -344,7 +373,7 @@ def update_job(job_key: str, payload: JobUpdate, session: Session = Depends(get_
     session.add(job)
     session.commit()
     session.refresh(job)
-    return _to_out(job)
+    return _out(session, job)
 
 
 @router.patch("/{job_key}/status", response_model=JobOut)
@@ -359,7 +388,7 @@ def move_status(job_key: str, payload: StatusMove, session: Session = Depends(ge
     session.add(job)
     session.commit()
     session.refresh(job)
-    return _to_out(job)
+    return _out(session, job)
 
 
 @router.post("/{job_key}/ignore", response_model=JobOut)
@@ -371,7 +400,48 @@ def ignore_job(job_key: str, session: Session = Depends(get_session)):
     session.add(job)
     session.commit()
     session.refresh(job)
-    return _to_out(job)
+    return _out(session, job)
+
+
+@router.put("/{job_key}/portal", response_model=JobOut)
+def set_company_portal(
+    job_key: str, payload: PortalIn, session: Session = Depends(get_session)
+):
+    """Set the candidate-portal home page for this job's company. The URL is
+    stored per-company, so every job at the same company shares it."""
+    job = session.get(Job, job_key)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    key = _company_key(job.company)
+    if not key:
+        raise HTTPException(400, "Job has no company to attach a portal URL to")
+    url = (payload.portal_url or "").strip()
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "Provide a valid portal URL (http/https).")
+
+    row = session.get(CompanyPortal, key)
+    if row:
+        row.portal_url = url
+        row.company = job.company or row.company
+        row.updated_at = _now()
+    else:
+        row = CompanyPortal(company_key=key, company=job.company or "", portal_url=url)
+    session.add(row)
+    session.commit()
+    return _out(session, job)
+
+
+@router.delete("/{job_key}/portal", response_model=JobOut)
+def clear_company_portal(job_key: str, session: Session = Depends(get_session)):
+    """Remove the shared candidate-portal URL for this job's company."""
+    job = session.get(Job, job_key)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    row = session.get(CompanyPortal, _company_key(job.company))
+    if row:
+        session.delete(row)
+        session.commit()
+    return _out(session, job)
 
 
 @router.post("/{job_key}/watchlist", response_model=JobOut)
@@ -386,7 +456,7 @@ def set_watchlist(
     session.add(job)
     session.commit()
     session.refresh(job)
-    return _to_out(job)
+    return _out(session, job)
 
 
 @router.post("/bulk-watchlist")
@@ -418,7 +488,7 @@ def refresh_description(job_key: str, session: Session = Depends(get_session)):
         session.add(job)
         session.commit()
         session.refresh(job)
-    return _to_out(job)
+    return _out(session, job)
 
 
 @router.post("/{job_key}/restore", response_model=JobOut)
@@ -434,7 +504,7 @@ def restore_job(job_key: str, session: Session = Depends(get_session)):
     session.add(job)
     session.commit()
     session.refresh(job)
-    return _to_out(job)
+    return _out(session, job)
 
 
 def _delete_with_dependents(session: Session, job: Job) -> None:

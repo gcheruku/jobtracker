@@ -81,6 +81,11 @@ class JobOut(BaseModel):
     mismatched: bool
     mismatch_reason: Optional[str]
     watchlist: bool                    # starred to revisit later
+    portal_url: Optional[str] = None   # company's candidate-portal home page (shared)
+
+
+class PortalIn(BaseModel):
+    portal_url: str
 
 
 class NoteIn(BaseModel):
