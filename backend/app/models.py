@@ -83,6 +83,22 @@ class GeoCache(SQLModel, table=True):
     created_at: str = Field(default_factory=utcnow_iso)
 
 
+class CompanyPortal(SQLModel, table=True):
+    """A company's candidate home page on its career portal.
+
+    Keyed by a normalized company name so the URL entered on any one job is
+    shared by every job at the same company. Created by create_all alongside
+    the other app-owned tables.
+    """
+
+    __tablename__ = "company_portal"
+
+    company_key: str = Field(primary_key=True)  # normalized company name (lookup key)
+    company: str                                 # display name (last writer wins)
+    portal_url: str = ""
+    updated_at: str = Field(default_factory=utcnow_iso)
+
+
 class Note(SQLModel, table=True):
     __tablename__ = "note"
 

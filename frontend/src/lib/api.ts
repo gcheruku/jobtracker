@@ -97,6 +97,15 @@ export const api = {
   refreshDescription(k: string): Promise<Job> {
     return http<Job>(`/api/jobs/${key(k)}/refresh-description`, { method: "POST" });
   },
+  setPortal(k: string, portal_url: string): Promise<Job> {
+    return http<Job>(`/api/jobs/${key(k)}/portal`, {
+      method: "PUT",
+      body: JSON.stringify({ portal_url }),
+    });
+  },
+  clearPortal(k: string): Promise<Job> {
+    return http<Job>(`/api/jobs/${key(k)}/portal`, { method: "DELETE" });
+  },
   deleteJob(k: string): Promise<void> {
     return http<void>(`/api/jobs/${key(k)}`, { method: "DELETE" });
   },

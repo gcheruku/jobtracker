@@ -14,6 +14,8 @@ import {
   Loader2,
   Star,
   ClipboardPaste,
+  Building2,
+  Check,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { PIPELINE, type Job, type PipelineStatus } from "../lib/types";
@@ -64,6 +66,10 @@ export function JobDetail({
   // the description so "Compare with Resume" has real text to score against.
   const [editingDesc, setEditingDesc] = useState(false);
   const [descDraft, setDescDraft] = useState("");
+  // Candidate-portal home page. Company-wide: saving it here reuses it for every
+  // job at the same company.
+  const [editingPortal, setEditingPortal] = useState(false);
+  const [portalDraft, setPortalDraft] = useState("");
 
   const notes = useQuery({
     queryKey: ["notes", job.job_key],
@@ -122,6 +128,24 @@ export function JobDetail({
   const toggleWatchlist = useMutation({
     mutationFn: () => api.setWatchlist(job.job_key, !job.watchlist),
     onSuccess: onChanged,
+  });
+  const savePortal = useMutation({
+    mutationFn: () => api.setPortal(job.job_key, portalDraft.trim()),
+    onSuccess: () => {
+      setEditingPortal(false);
+      // The URL is company-wide, so any other open/cached job at this company
+      // should pick it up too.
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      onChanged();
+    },
+  });
+  const clearPortal = useMutation({
+    mutationFn: () => api.clearPortal(job.job_key),
+    onSuccess: () => {
+      setEditingPortal(false);
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      onChanged();
+    },
   });
   const ignore = useMutation({
     mutationFn: () => api.ignoreJob(job.job_key),
@@ -252,6 +276,100 @@ export function JobDetail({
                 </a>
               )}
             </dl>
+
+            {/* Candidate portal — stored per-company and reused for every job
+                at the same company. */}
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              {editingPortal ? (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                    <Building2 size={14} className="text-slate-400" />
+                    Candidate portal for {job.company || "this company"}
+                  </label>
+                  <input
+                    value={portalDraft}
+                    onChange={(e) => setPortalDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && portalDraft.trim()) savePortal.mutate();
+                      if (e.key === "Escape") setEditingPortal(false);
+                    }}
+                    autoFocus
+                    placeholder="https://careers.example.com/candidate/home"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => savePortal.mutate()}
+                      disabled={savePortal.isPending || !portalDraft.trim()}
+                      className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      {savePortal.isPending ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Check size={13} />
+                      )}
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingPortal(false)}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    {job.portal_url && (
+                      <button
+                        onClick={() => clearPortal.mutate()}
+                        disabled={clearPortal.isPending}
+                        className="rounded-lg px-2 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    )}
+                    <span className="text-xs text-slate-400">
+                      Shared by all {job.company || "company"} jobs
+                    </span>
+                    {savePortal.isError && (
+                      <span className="text-xs text-rose-500">
+                        Enter a valid http(s) URL.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : job.portal_url ? (
+                <div className="flex items-center justify-between gap-2">
+                  <a
+                    href={job.portal_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-w-0 items-center gap-2 text-indigo-600 hover:underline"
+                    title={job.portal_url}
+                  >
+                    <Building2 size={15} className="shrink-0" />
+                    <span className="truncate">Candidate portal</span>
+                  </a>
+                  <button
+                    onClick={() => {
+                      setPortalDraft(job.portal_url ?? "");
+                      setEditingPortal(true);
+                    }}
+                    className="shrink-0 text-xs font-medium text-slate-400 hover:text-slate-600"
+                  >
+                    Edit
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setPortalDraft("");
+                    setEditingPortal(true);
+                  }}
+                  className="flex items-center gap-2 text-sm text-slate-500 hover:text-indigo-600"
+                >
+                  <Building2 size={15} className="text-slate-400" />
+                  Add candidate portal URL
+                </button>
+              )}
+            </div>
           </Section>
 
           {/* Description (rich Markdown, not truncated). Always shown so a JD

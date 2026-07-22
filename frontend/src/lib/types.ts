@@ -51,6 +51,9 @@ export interface Job {
   mismatched: boolean;
   mismatch_reason: string | null;
   watchlist: boolean;
+  // The company's candidate-portal home page. Stored per-company: set it on one
+  // job and every job at the same company shares it.
+  portal_url: string | null;
 }
 
 export interface Stats {
