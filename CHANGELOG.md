@@ -7,6 +7,25 @@ to follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Mobile/iOS navigation: URL-driven routing (`react-router`), scroll restoration
+  when opening/closing a job, and swipe navigation between jobs in the focus view.
+  Browser back, refresh, bookmarking, and iOS edge-swipe now all work.
+- Per-company candidate-portal URL: save a company's career-portal link on any one
+  job and it's shared across every job at that company.
+- Add a job from a career-portal / posting URL (`POST /api/jobs/from-url`): fetches
+  and extracts title/company/location/salary/JD (JSON-LD or embedded markup, with a
+  Gemini fallback), then scores and persists it like an ingested job.
+- Ingest **Dice** alerts by recognizing `elinks.dice.com` click-tracker links
+  (previously every Dice link was dropped, so no Dice jobs were ingested).
+- Paste a job description manually in the detail view when the source can't be
+  fetched (bot-walled or expired).
+- Expired-posting sweep for the Saved column (opt-in, `EXPIRY_SWEEP_ENABLED`):
+  a scheduled/CLI job moves lapsed postings to Expired, only ever under-expiring
+  (bot-walls/errors leave jobs untouched) and never sweeping starred jobs.
+- "Hide handled" search toggle (hides starred + in-pipeline jobs from results).
+- Watchlist: star jobs to revisit later — a marker orthogonal to pipeline status,
+  with its own sidebar view and count.
+- "Select all" in search results.
 - Search match modes (All words / Any word / Exact phrase) via a selector next to
   the search box; "Exact phrase" matches whole words contiguously, so "software
   engineer" no longer returns "Software Engineering Manager".

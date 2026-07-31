@@ -87,6 +87,10 @@ GOOGLE_API_KEY=your-gemini-key
 # ANTHROPIC_API_KEY=sk-ant-...
 # GMAIL_LABEL=Job alerts
 # INGEST_INTERVAL_HOURS=4
+# Opt-in daily sweep that moves lapsed Saved postings to Expired (off by default):
+# EXPIRY_SWEEP_ENABLED=true
+# EXPIRY_SWEEP_INTERVAL_HOURS=24
+# EXPIRY_SWEEP_DELAY_S=1.0
 EOF
 ```
 
