@@ -82,7 +82,7 @@ backend/
     main.py            FastAPI app, middleware (CORS, request logging), router wiring, scheduler lifecycle
     config.py          Env-driven config (keys, models, paths, CORS); loads /data/.env in prod
     database.py        SQLModel engine + get_session dependency
-    models.py          The Job table (+ notes, checklist, resume, geo_cache, meta)
+    models.py          Job, note, checklist, resume, geo_cache, company_portal (+ meta k/v)
     schemas.py         Pydantic request/response models (incl. Settings)
     scheduler.py       APScheduler setup: periodic ingest
     logging_config.py  Structured logging
@@ -93,7 +93,9 @@ backend/
       alert_parsers.py    Deterministic Indeed/Glassdoor parsers
       gemini_client.py    Gemini extraction + resume-fit analysis
       ingest.py           Orchestrates the ingestion pipeline (the heart)
-      jd_fetch.py         Fetch + clean job descriptions (anti-bot aware)
+      jd_fetch.py         Fetch + clean job descriptions (anti-bot aware); also
+                          full-posting extraction (title/company/JD) for add-from-URL
+      expiry.py           Sweep the Saved column; move lapsed postings to Expired
       ai.py               Resume-fit (Gemini, or offline heuristic)
       semantic.py         Offline embedding-based resume↔JD scoring
       preferences.py      User settings storage + "apply to board" matching
@@ -107,14 +109,15 @@ backend/
 
 frontend/
   src/
-    App.tsx            Top-level state, view switching, multi-select, mutations
-    main.tsx           React/Query providers
+    App.tsx            Top-level state; URL-driven views (react-router), multi-select, mutations
+    main.tsx           React / Query / Router providers
     lib/
       api.ts           Typed REST client (fetch wrapper)
       agent.ts         SSE streaming client for the assistant
       types.ts         Shared TypeScript types
       filters.ts, ui.ts  Board filtering + display helpers
-    components/        Board, drawer, focus view, search, settings, assistant, etc.
+    components/        Board, drawer, focus view (swipe nav), watchlist, search,
+                       add-job (from URL), settings, assistant, etc.
   nginx.conf           /api proxy, gzip, immutable asset caching
   vite.config.ts       Vendor code-splitting, dev proxy
 
@@ -200,17 +203,44 @@ as a JSON blob in a `meta` row. "Apply" re-evaluates the board and moves clearly
 non-matching jobs to a "Mismatched" bucket — **lenient**: unknown salary/location
 stays on the board rather than being hidden.
 
+### 5.6 Expired-posting sweep (`services/expiry.py`)
+
+An opt-in background job (`EXPIRY_SWEEP_ENABLED`, daily by default) re-checks the
+Saved column and moves lapsed postings to the **Expired** state, so stale saves
+don't accumulate. Shared by the scheduler and the `expire_saved_jobs.py` CLI so
+both use one definition of "gone": a posting is expired only when its live page
+shows an expiry banner or 404/410s. **It only ever under-expires** — a bot wall
+(403/429 or a 200 challenge page) or any fetch error leaves the job untouched,
+and starred (watchlist) jobs are always excluded. Runs are self-locking (a manual
+CLI run and a scheduled tick never fetch/commit concurrently) and pace fetches
+(`EXPIRY_SWEEP_DELAY_S`) to keep the NAS IP off bot-walls.
+
+### 5.7 Add a job from a URL (`POST /api/jobs/from-url`)
+
+Besides email ingestion, a job can be added by pasting a posting URL (the "Add
+job" button). `jd_fetch.fetch_job_posting()` fetches the page through the same
+per-host anti-bot client stack and extracts title / company / location / salary /
+JD from JSON-LD or embedded job markup, with a Gemini fallback to fill fields the
+markup didn't yield. The result is scored and persisted like an ingested job.
+
 ---
 
 ## 6. Frontend architecture
 
-- **Single-page app**, no router — the whole UI is view-switching state in
-  `App.tsx` (dashboard / mismatched / inactive / settings / search / focus).
+- **Single-page app** with **`react-router` (BrowserRouter)** driving navigation.
+  The screen (`dashboard` / `watchlist` / `mismatched` / `inactive` / `settings`)
+  is derived from the URL path, and an open job is a `?job=<key>` query param
+  layered on top of the current screen. This makes browser back, refresh,
+  bookmarking, and **iOS edge-swipe** all work, and — because the list stays
+  mounted under the `?job=` overlay — **scroll position is preserved** when you
+  open a job and return. Switching jobs (list click / swipe within `FocusView`)
+  replaces history so Back returns to the list, not the previously viewed job.
 - **Server state via TanStack Query**; `lib/api.ts` is a typed `fetch` wrapper.
-  Mutations use **optimistic updates** (dragging a card across columns flips
-  status instantly, then reconciles with the server).
+  Mutations use **optimistic updates** (dragging a card across columns, or
+  starring a job, flips state instantly, then reconciles with the server).
 - **Key components:** `KanbanBoard` (dnd-kit columns), `JobDrawer` / `FocusView`
-  (detail, side-by-side), `SearchResults`, `SettingsView`, `AgentChat`.
+  (detail, side-by-side, swipe between jobs), `WatchlistView`, `SearchResults`,
+  `AddJobButton` (add from URL), `SettingsView`, `AgentChat`.
 - **Performance work (measured):** the initial bundle was one ~180 KB-gzip chunk.
   It was reduced to ~92 KB gzip (~50%) by (a) splitting vendor chunks
   (`vite.config.ts` `manualChunks`), (b) lazy-loading the Markdown renderer, the
@@ -224,16 +254,23 @@ stays on the board rather than being hidden.
 ## 7. Data model (`models.py`)
 
 One central `Job` table (SQLite), plus `note`, `checklist_item`, `resume`,
-`geo_cache`, and a `meta` key/value table (watermark, preferences).
+`geo_cache`, `company_portal`, and a `meta` key/value table (watermark,
+preferences).
 
 ```mermaid
 erDiagram
     JOB ||--o{ NOTE : has
     JOB ||--o{ CHECKLIST_ITEM : has
     RESUME ||..|| JOB : "scored against"
+    COMPANY_PORTAL ||--o{ JOB : "shared by company"
     META {
         string key
         string value
+    }
+    COMPANY_PORTAL {
+        string company_key PK
+        string company
+        string portal_url
     }
     JOB {
         string job_key PK
@@ -252,6 +289,7 @@ erDiagram
         float  semantic_score
         bool   ignored
         bool   mismatched
+        bool   watchlist
         float  distance_miles
         int    email_epoch
     }
@@ -261,7 +299,10 @@ erDiagram
 signals (`match_pct`, `llm_match_pct`, `semantic_score`, `compare_*`) let the UI
 sort and threshold without recomputing. `email_epoch` is the ingest watermark
 source; `ignored` (skipped) and `mismatched` (failed a preference) keep jobs off
-the board without deleting them.
+the board without deleting them; `watchlist` stars a job to revisit later,
+orthogonal to its pipeline status. `company_portal` stores a company's
+candidate-portal URL keyed by normalized company name, so the link entered on any
+one job is shared by every job at that company.
 
 ---
 
