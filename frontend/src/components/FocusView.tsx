@@ -28,7 +28,7 @@ function ListItem({
           {initials(job.company)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold leading-tight">
+          <div className="break-words text-sm font-semibold leading-tight">
             {job.title || "Untitled role"}
           </div>
           <div className="truncate text-xs text-slate-500">

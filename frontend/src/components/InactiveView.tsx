@@ -179,12 +179,12 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="block truncate text-sm font-semibold text-indigo-700 hover:underline"
+                        className="block break-words text-sm font-semibold text-indigo-700 hover:underline"
                       >
                         {j.title}
                       </a>
                     ) : (
-                      <span className="block truncate text-sm font-semibold">{j.title}</span>
+                      <span className="block break-words text-sm font-semibold">{j.title}</span>
                     )}
                     <div className="truncate text-xs text-slate-500">{j.company}</div>
                     <div className="mt-1.5 flex items-center gap-1.5">
