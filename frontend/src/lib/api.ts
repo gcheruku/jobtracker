@@ -23,8 +23,17 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`${res.status} ${detail}`);
+    // FastAPI errors come back as {"detail": "..."} — surface just the message,
+    // since these strings are shown to the user verbatim.
+    const body = await res.text();
+    let detail = body;
+    try {
+      const parsed = JSON.parse(body);
+      if (typeof parsed?.detail === "string") detail = parsed.detail;
+    } catch {
+      /* not JSON — show the raw body */
+    }
+    throw new Error(detail || `Request failed (${res.status})`);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

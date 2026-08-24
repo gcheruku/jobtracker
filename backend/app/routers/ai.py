@@ -18,12 +18,10 @@ from ..database import get_session
 from ..logging_config import logger
 from ..models import Job, Resume
 from ..schemas import CompareRequest, CompareResult, ModelsOut
-from ..services.ai import compute_fit
+from ..services.ai import compute_fit, has_job_description
 from ..services.gemini_client import list_models
 from ..services.jd_fetch import fetch_job_description
 from ..services.resume_loader import resume_text as docx_resume_text
-
-_MIN_JD = 200  # chars below which we treat the stored description as missing
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -96,14 +94,26 @@ def run_compare(
 
     # Ensure we have a real job description. If the stored one is missing/short,
     # try to fetch it from the posting URL and persist it on the job.
-    if (not job.job_description or len(job.job_description) < _MIN_JD) and job.url:
+    if not has_job_description(job.job_description) and job.url:
         fetched = fetch_job_description(job.url)
-        if fetched and len(fetched) >= _MIN_JD:
+        if has_job_description(fetched):
             job.job_description = fetched
             session.add(job)
             session.commit()
 
-    used_jd = bool(job.job_description and len(job.job_description) >= _MIN_JD)
+    used_jd = has_job_description(job.job_description)
+    if not used_jd:
+        # Without a real JD the model only sees the title/company header, which
+        # yields a confident-looking but meaningless score. Refuse rather than
+        # burn a paid call — the UI lets the user paste the description in.
+        raise HTTPException(
+            422,
+            "No job description available for this posting"
+            + (" (the link may require login)" if job.url else "")
+            + ". Paste the description into the job's Description field, then "
+            "run the comparison again.",
+        )
+
     header = " | ".join(filter(None, [job.title, job.company, job.location, job.salary]))
     job_text = f"{header}\n\n{job.job_description or ''}".strip()
 
