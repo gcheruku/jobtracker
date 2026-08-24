@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 
 from ..database import engine
 from ..models import Job
-from ..services.ai import compute_fit
+from ..services.ai import compute_fit, has_job_description
 from ..services.resume_loader import resume_text
 
 # --- executors ---------------------------------------------------------------
@@ -35,7 +35,7 @@ def _job_summary(j: Job) -> dict:
         **{f: getattr(j, f) for f in _JOB_FIELDS},
         "status": "Skipped" if j.ignored else (j.status or "Saved"),
         "match_pct": round(match) if match is not None else None,
-        "has_description": bool(j.job_description),
+        "has_description": has_job_description(j.job_description),
     }
 
 
@@ -110,8 +110,16 @@ def compare_resume_to_job(args: dict) -> dict:
         j = session.get(Job, key)
         if not j:
             return {"error": f"No job with job_key={key!r}"}
+        if not has_job_description(j.job_description):
+            # No real JD means the model would score the title/company header
+            # alone. Report that instead of running a meaningless comparison.
+            return {
+                "error": "This job has no job description stored, so a resume "
+                "comparison would be meaningless. Ask the user to paste the "
+                "description into the job first."
+            }
         header = f"{j.title or ''} at {j.company or ''}\n{j.location or ''}\n{j.salary or ''}"
-        job_text = f"{header}\n\n{j.job_description or ''}".strip()
+        job_text = f"{header}\n\n{j.job_description}".strip()
     resume = resume_text()
     if not resume:
         return {"error": "No resume is configured to compare against."}
@@ -122,7 +130,7 @@ def compare_resume_to_job(args: dict) -> dict:
     return {
         "match_score": result.get("match_score"),
         "report_markdown": result.get("report_markdown"),
-        "used_job_description": bool(j.job_description),
+        "used_job_description": True,
     }
 
 

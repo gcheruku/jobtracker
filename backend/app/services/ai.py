@@ -10,6 +10,14 @@ from ..config import GEMINI_MODEL, GOOGLE_API_KEY
 from ..logging_config import logger
 from .gemini_client import analyze_fit
 
+# Below this many characters a stored description is treated as missing: the
+# model would only see the title/company header and produce a meaningless score.
+MIN_JD_CHARS = 200
+
+
+def has_job_description(text: str | None) -> bool:
+    return bool(text and len(text) >= MIN_JD_CHARS)
+
 _SKILL_VOCAB = [
     "python", "java", "javascript", "typescript", "go", "rust", "c++", "react",
     "vue", "angular", "node", "fastapi", "django", "spring", "sql", "postgres",

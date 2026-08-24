@@ -35,6 +35,10 @@ function Report({ r }: { r: CompareResult }) {
   );
 }
 
+// Mirrors MIN_JD_CHARS in backend/app/services/ai.py: shorter than this and the
+// backend refuses to run the analysis rather than score the title alone.
+const MIN_JD_CHARS = 200;
+
 export function ComparePanel({ job, onClose }: { job: Job; onClose: () => void }) {
   const qc = useQueryClient();
   const [model, setModel] = useState<string | undefined>(undefined);
@@ -59,6 +63,7 @@ export function ComparePanel({ job, onClose }: { job: Job; onClose: () => void }
 
   const result = saved.data ?? null;
   const busy = run.isPending;
+  const hasJd = (job.job_description?.length ?? 0) >= MIN_JD_CHARS;
 
   const ModelPicker = models.data?.enabled ? (
     <select
@@ -118,6 +123,15 @@ export function ComparePanel({ job, onClose }: { job: Job; onClose: () => void }
                 <span className="font-medium">{job.title}</span>: match score, skill
                 alignment, gaps & red flags, and rewritten bullet points.
               </p>
+              {!hasJd && (
+                <div className="mb-4 flex gap-2 rounded-lg bg-amber-50 p-3 text-left text-xs text-amber-700">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  No job description is stored for this posting.{" "}
+                  {job.url
+                    ? "Running will first try to fetch it from the posting; if that fails the analysis is skipped."
+                    : "Paste the description into the job's Description field first — the analysis needs it."}
+                </div>
+              )}
               {ModelPicker && <div className="mb-3 flex justify-center">{ModelPicker}</div>}
               <button
                 onClick={() => run.mutate(false)}
