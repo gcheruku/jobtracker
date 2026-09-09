@@ -46,6 +46,8 @@ export interface Job {
   compare_at: string | null;
   job_description: string | null;
   email_date: string | null;
+  // When the job was saved into the tracker (ingested from the Gmail alert).
+  inserted_at: string | null;
   status_updated_at: string | null;
   ignored: boolean;
   mismatched: boolean;

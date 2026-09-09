@@ -94,6 +94,7 @@ def _to_out(job: Job, portal_url: Optional[str] = None) -> JobOut:
         compare_at=job.compare_at,
         job_description=job.job_description,
         email_date=job.email_date,
+        inserted_at=job.inserted_at,
         status_updated_at=job.status_updated_at,
         ignored=bool(job.ignored),
         mismatched=bool(job.mismatched),

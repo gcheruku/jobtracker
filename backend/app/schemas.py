@@ -75,7 +75,8 @@ class JobOut(BaseModel):
     compare_score: Optional[float]    # detailed "Compare with Resume" score
     compare_at: Optional[str]
     job_description: Optional[str]
-    email_date: Optional[str]
+    email_date: Optional[str]        # date of the alert email the job came from
+    inserted_at: Optional[str] = None  # when the job was saved into the tracker
     status_updated_at: Optional[str]
     ignored: bool
     mismatched: bool

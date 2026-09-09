@@ -41,3 +41,16 @@ export function timeAgo(iso: string | null): string {
   if (days < 30) return `${days}d ago`;
   return new Date(iso).toLocaleDateString();
 }
+
+// Compact absolute date ("Aug 24, 2026") for table columns, where a relative
+// "3d ago" is harder to scan than the day itself. Empty string if unparseable.
+export function shortDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
