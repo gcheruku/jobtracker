@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RotateCcw, Trash2, Archive, ChevronDown } from "lucide-react";
+import {
+  RotateCcw,
+  Trash2,
+  Archive,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+} from "lucide-react";
 import { api } from "../lib/api";
 import { STATUS_STYLES, initials, shortDate } from "../lib/ui";
 import { SourceTag } from "./SourceTag";
@@ -15,6 +22,60 @@ function label(job: Job): string {
 
 const STATUS_OPTIONS = ["All", "Skipped", "Rejected", "Expired"];
 
+type SortKey = "title" | "company" | "source" | "status" | "saved";
+type SortDir = "asc" | "desc";
+type Sort = { key: SortKey; dir: SortDir };
+
+// Columns whose natural first click is newest/highest first.
+const DESC_FIRST: SortKey[] = ["saved"];
+
+function compare(a: Job, b: Job, key: SortKey): number {
+  if (key === "saved") {
+    // Missing timestamps read as the epoch, so they group at the oldest end
+    // instead of scattering through the list.
+    const av = a.inserted_at ? Date.parse(a.inserted_at) : 0;
+    const bv = b.inserted_at ? Date.parse(b.inserted_at) : 0;
+    return (Number.isNaN(av) ? 0 : av) - (Number.isNaN(bv) ? 0 : bv);
+  }
+  const text = (j: Job) =>
+    key === "status" ? label(j) : (j[key] ?? "");
+  return text(a).localeCompare(text(b), undefined, { sensitivity: "base" });
+}
+
+// A column header that sorts on click. The inactive state still shows a
+// (dimmed) arrow so it's obvious every column can be sorted.
+function SortHeader({
+  text,
+  sortKey,
+  sort,
+  onSort,
+}: {
+  text: string;
+  sortKey: SortKey;
+  sort: Sort | null;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sort?.key === sortKey;
+  const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ChevronUp : ChevronDown;
+  return (
+    <th
+      className="px-4 py-3"
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex select-none items-center gap-1 uppercase tracking-wide hover:text-slate-600 ${
+          active ? "text-slate-600" : ""
+        }`}
+      >
+        {text}
+        <Icon size={13} className={active ? "" : "opacity-40"} />
+      </button>
+    </th>
+  );
+}
+
 export function InactiveView({ filters }: { filters: JobFilters }) {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("All");
@@ -22,6 +83,8 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
   // Row index of the last checkbox clicked, used as the far end of a
   // shift-click range. Reset whenever the visible rows change.
   const [anchor, setAnchor] = useState<number | null>(null);
+  // null = leave the server's ordering (most recent first) alone.
+  const [sort, setSort] = useState<Sort | null>(null);
 
   const jobs = useQuery({
     queryKey: ["jobs", "inactive", filters],
@@ -30,10 +93,24 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
 
   const rows = useMemo(() => {
     const all = jobs.data ?? [];
-    return statusFilter === "All"
-      ? all
-      : all.filter((j) => label(j) === statusFilter);
-  }, [jobs.data, statusFilter]);
+    const filtered =
+      statusFilter === "All" ? all : all.filter((j) => label(j) === statusFilter);
+    if (!sort) return filtered;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => compare(a, b, sort.key) * dir);
+  }, [jobs.data, statusFilter, sort]);
+
+  // Click a column to sort by it, click again to flip. Selections survive
+  // (they're keyed by job), but the shift-range anchor is a row index, so it
+  // has to go when the order changes.
+  const sortBy = (key: SortKey) => {
+    setSort((prev) =>
+      prev?.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: DESC_FIRST.includes(key) ? "desc" : "asc" },
+    );
+    setAnchor(null);
+  };
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["jobs"] });
@@ -252,11 +329,11 @@ export function InactiveView({ filters }: { filters: JobFilters }) {
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600"
                 />
               </th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Company</th>
-              <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Saved</th>
+              <SortHeader text="Role" sortKey="title" sort={sort} onSort={sortBy} />
+              <SortHeader text="Company" sortKey="company" sort={sort} onSort={sortBy} />
+              <SortHeader text="Source" sortKey="source" sort={sort} onSort={sortBy} />
+              <SortHeader text="Status" sortKey="status" sort={sort} onSort={sortBy} />
+              <SortHeader text="Saved" sortKey="saved" sort={sort} onSort={sortBy} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
